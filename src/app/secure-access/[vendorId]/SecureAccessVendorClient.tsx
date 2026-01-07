@@ -185,6 +185,7 @@ export default function SecureAccessVendorClient() {
   }
 
   function handleCancel() {
+    if (!vendor) return;
     setEditing(false);
     setForm({
       name: vendor.name,
