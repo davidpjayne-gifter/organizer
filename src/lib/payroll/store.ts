@@ -168,12 +168,16 @@ export const getEmployees = (orgId: string) => {
   return state.employeesByOrgId[orgId] ?? [];
 };
 
-export const getPayrollProfile = (orgId: string, employeeId: string) => {
+const normalizePayType = (value: PayrollProfile["payType"] | string | undefined) =>
+  value === "Salary" ? "Salary" : "Hourly";
+
+export const getPayrollProfile = (orgId: string, employeeId: string): PayrollProfile => {
   const state = ensureOrgInitialized(orgId, loadPayrollState());
   const profile = state.payrollByOrgId[orgId]?.[employeeId];
   if (profile) {
     return {
       ...profile,
+      payType: normalizePayType(profile.payType),
       payPeriodsPerYear:
         Number.isFinite(profile.payPeriodsPerYear) && profile.payPeriodsPerYear > 0
           ? profile.payPeriodsPerYear
