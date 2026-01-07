@@ -125,6 +125,7 @@ export default function SecureAccessVendorClient() {
   }
 
   async function handleCopy() {
+    if (!vendor) return;
     try {
       await navigator.clipboard.writeText(vendor.password);
       setCopyStatus("Copied");
