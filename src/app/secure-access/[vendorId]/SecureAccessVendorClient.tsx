@@ -140,6 +140,7 @@ export default function SecureAccessVendorClient() {
   }
 
   function handleSave() {
+    if (!vendor) return;
     const changes: string[] = [];
     const patch: Partial<Vendor> = {};
 
