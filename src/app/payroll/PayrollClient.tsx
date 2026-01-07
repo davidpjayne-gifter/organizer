@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Employee,
   createEmployeeProfile,
@@ -58,6 +59,7 @@ interface PayrollClientProps {
 }
 
 export default function PayrollClient({ orgId, orgName, actorName }: PayrollClientProps) {
+  const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [search, setSearch] = useState("");
