@@ -145,6 +145,7 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
       if (!trimmed.name || !trimmed.role || !trimmed.department) {
         return;
       }
+      if (!form) return;
       const nextProfile = formToProfile(form);
       const created = createEmployeeProfile(orgId, trimmed, nextProfile);
       const refreshedEmployees = getEmployees(orgId);
