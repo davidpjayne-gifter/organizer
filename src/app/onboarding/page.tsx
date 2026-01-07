@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { createOrg, ensureUserHasOrgOrNull } from "@/lib/org/store";
+import { NativeMessage } from "@/components/ui/NativeMessage";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -72,13 +73,11 @@ export default function OnboardingPage() {
             />
           </div>
 
-          {error ? <div className="text-sm text-red-600">{error}</div> : null}
+          {error ? (
+            <NativeMessage title="Organization name needed" body={error} tone="danger" />
+          ) : null}
 
-          <button
-            className="w-full rounded-xl border px-4 py-2 font-medium hover:bg-black/5 disabled:opacity-50"
-            type="submit"
-            disabled={status === "loading"}
-          >
+          <button className="btn btn-primary w-full" type="submit" disabled={status === "loading"}>
             {status === "loading" ? "Creating…" : "Create Organization"}
           </button>
         </form>

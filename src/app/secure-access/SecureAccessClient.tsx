@@ -9,6 +9,8 @@ import {
   logVendorEvent,
   Vendor,
 } from "@/lib/secure-access/store";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { NativeMessage } from "@/components/ui/NativeMessage";
 
 const emptyForm = {
   name: "",
@@ -137,9 +139,10 @@ export default function SecureAccessClient({ orgId, orgName }: SecureAccessClien
             </div>
 
             {toast ? (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                {toast}
-              </div>
+              <NativeMessage
+                title={toast}
+                tone={toast.toLowerCase().includes("please") ? "warning" : "success"}
+              />
             ) : null}
 
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -177,7 +180,7 @@ export default function SecureAccessClient({ orgId, orgName }: SecureAccessClien
                     type={formReveal ? "text" : "password"}
                   />
                   <button
-                    className="rounded-xl border px-3 text-sm"
+                    className="btn btn-sm"
                     type="button"
                     onClick={() => setFormReveal((prev) => !prev)}
                   >
@@ -221,13 +224,13 @@ export default function SecureAccessClient({ orgId, orgName }: SecureAccessClien
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button
-                  className="w-full rounded-xl border px-4 py-2 font-medium hover:bg-black/5"
+                  className="btn btn-primary w-full"
                   type="submit"
                 >
                   Create Vendor
                 </button>
                 <button
-                  className="w-full rounded-xl border px-4 py-2 text-sm opacity-80 hover:opacity-100"
+                  className="btn w-full"
                   type="button"
                   onClick={handleClear}
                 >
@@ -264,8 +267,11 @@ export default function SecureAccessClient({ orgId, orgName }: SecureAccessClien
 
             <div className="flex-1 min-h-[280px]">
               {filteredVendors.length === 0 ? (
-                <div className="rounded-2xl border border-dashed p-10 text-center text-sm opacity-70">
-                  No vendors yet — create your first vendor profile.
+                <div className="p-6">
+                  <EmptyState
+                    title="No vendors yet"
+                    body="Create your first vendor profile to get started."
+                  />
                 </div>
               ) : (
                 <div className="max-h-[420px] overflow-y-auto rounded-2xl border divide-y">

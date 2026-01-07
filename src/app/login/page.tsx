@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { NativeMessage } from "@/components/ui/NativeMessage";
 
 export default function LoginPage() {
   const supabase = supabaseBrowser();
@@ -46,19 +47,24 @@ export default function LoginPage() {
             type="email"
             required
           />
-          <button
-            className="w-full rounded-xl border px-3 py-2 font-medium hover:bg-black/5 disabled:opacity-50"
-            disabled={status === "sending"}
-            type="submit"
-          >
+          <button className="btn btn-primary w-full" disabled={status === "sending"} type="submit">
             {status === "sending" ? "Sending…" : "Send login link"}
           </button>
         </form>
 
-        {message ? <p className="mt-4 text-sm">{message}</p> : null}
-
+        {status === "error" ? (
+          <div className="mt-4">
+            <NativeMessage title="Login failed" body={message} tone="danger" />
+          </div>
+        ) : null}
         {status === "sent" ? (
-          <p className="mt-2 text-xs opacity-70">You can close this tab after you click the email link.</p>
+          <div className="mt-4">
+            <NativeMessage
+              title="Check your email"
+              body={`${message} You can close this tab after you click the email link.`}
+              tone="success"
+            />
+          </div>
         ) : null}
       </div>
     </main>

@@ -12,6 +12,8 @@ export interface PayrollProfile {
   ptoAccrualRate: number;
   stipend: number;
   notes: string;
+  payPeriodsPerYear: number;
+  isActive: boolean;
   effectiveDate: string;
 }
 
@@ -25,6 +27,8 @@ export interface PayrollChangeLog {
   summary: string;
   fieldsChanged: string[];
   changeType?: string;
+  noteBefore?: string;
+  noteAfter?: string;
 }
 
 interface PayrollState {
@@ -64,6 +68,8 @@ const defaultProfileFor = (employee: Employee): PayrollProfile => {
       ptoAccrualRate: 6,
       stipend: 150,
       notes: "",
+      payPeriodsPerYear: 26,
+      isActive: true,
       effectiveDate: new Date().toISOString().slice(0, 10),
     };
   }
@@ -75,6 +81,8 @@ const defaultProfileFor = (employee: Employee): PayrollProfile => {
     ptoAccrualRate: 4,
     stipend: 100,
     notes: "",
+    payPeriodsPerYear: 26,
+    isActive: true,
     effectiveDate: new Date().toISOString().slice(0, 10),
   };
 };
@@ -163,7 +171,17 @@ export const getEmployees = (orgId: string) => {
 export const getPayrollProfile = (orgId: string, employeeId: string) => {
   const state = ensureOrgInitialized(orgId, loadPayrollState());
   const profile = state.payrollByOrgId[orgId]?.[employeeId];
-  if (profile) return profile;
+  if (profile) {
+    return {
+      ...profile,
+      payPeriodsPerYear:
+        Number.isFinite(profile.payPeriodsPerYear) && profile.payPeriodsPerYear > 0
+          ? profile.payPeriodsPerYear
+          : 26,
+      isActive: typeof profile.isActive === "boolean" ? profile.isActive : true,
+      notes: profile.notes ?? "",
+    };
+  }
   return {
     payType: "Hourly",
     hourlyRate: 0,
@@ -171,6 +189,8 @@ export const getPayrollProfile = (orgId: string, employeeId: string) => {
     ptoAccrualRate: 0,
     stipend: 0,
     notes: "",
+    payPeriodsPerYear: 26,
+    isActive: true,
     effectiveDate: new Date().toISOString().slice(0, 10),
   };
 };
@@ -183,6 +203,8 @@ const diffFields = (prev: PayrollProfile, next: PayrollProfile) => {
   if (prev.ptoAccrualRate !== next.ptoAccrualRate) changes.push("PTO accrual rate");
   if (prev.stipend !== next.stipend) changes.push("Stipend");
   if (prev.notes !== next.notes) changes.push("Notes");
+  if (prev.payPeriodsPerYear !== next.payPeriodsPerYear) changes.push("Pay periods per year");
+  if (prev.isActive !== next.isActive) changes.push("Employment status");
   if (prev.effectiveDate !== next.effectiveDate) changes.push("Effective date");
   return changes;
 };
@@ -227,6 +249,7 @@ export const updatePayrollProfile = (
 
   let nextLogByOrg = state.payrollChangeLogByOrgId;
   if (fieldsChanged.length > 0) {
+    const notesChanged = prevProfile.notes !== nextProfile.notes;
     const log: PayrollChangeLog = {
       id: createId(),
       orgId,
@@ -237,6 +260,8 @@ export const updatePayrollProfile = (
       summary: "Updated payroll fields",
       fieldsChanged,
       changeType: changeTypeFor(fieldsChanged),
+      noteBefore: notesChanged ? prevProfile.notes : undefined,
+      noteAfter: notesChanged ? nextProfile.notes : undefined,
     };
 
     const existing = state.payrollChangeLogByOrgId[orgId] ?? [];
@@ -254,4 +279,39 @@ export const updatePayrollProfile = (
 
   savePayrollState(nextState);
   return { fieldsChanged };
+};
+
+export const createEmployeeProfile = (
+  orgId: string,
+  employeeInput: Omit<Employee, "id">,
+  profile: PayrollProfile
+) => {
+  const state = ensureOrgInitialized(orgId, loadPayrollState());
+  const employee: Employee = {
+    id: createId(),
+    name: employeeInput.name.trim(),
+    role: employeeInput.role.trim(),
+    department: employeeInput.department.trim(),
+  };
+
+  const nextEmployees = [...(state.employeesByOrgId[orgId] ?? []), employee];
+  const nextPayrollByOrg = {
+    ...state.payrollByOrgId,
+    [orgId]: {
+      ...state.payrollByOrgId[orgId],
+      [employee.id]: profile,
+    },
+  };
+
+  const nextState: PayrollState = {
+    ...state,
+    employeesByOrgId: {
+      ...state.employeesByOrgId,
+      [orgId]: nextEmployees,
+    },
+    payrollByOrgId: nextPayrollByOrg,
+  };
+
+  savePayrollState(nextState);
+  return employee;
 };

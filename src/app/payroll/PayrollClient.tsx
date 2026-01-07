@@ -3,11 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Employee,
+  createEmployeeProfile,
   getEmployees,
   getPayrollProfile,
   PayrollProfile,
   updatePayrollProfile,
 } from "@/lib/payroll/store";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { NativeMessage } from "@/components/ui/NativeMessage";
 
 interface PayrollFormState {
   payType: "Hourly" | "Salary";
@@ -16,6 +19,8 @@ interface PayrollFormState {
   ptoAccrualRate: string;
   stipend: string;
   notes: string;
+  payPeriodsPerYear: string;
+  isActive: boolean;
   effectiveDate: string;
 }
 
@@ -26,6 +31,8 @@ const profileToForm = (profile: PayrollProfile): PayrollFormState => ({
   ptoAccrualRate: profile.ptoAccrualRate.toString(),
   stipend: profile.stipend.toString(),
   notes: profile.notes,
+  payPeriodsPerYear: profile.payPeriodsPerYear.toString(),
+  isActive: profile.isActive ?? true,
   effectiveDate: profile.effectiveDate,
 });
 
@@ -38,6 +45,8 @@ const formToProfile = (form: PayrollFormState): PayrollProfile => {
     ptoAccrualRate: toNumber(form.ptoAccrualRate),
     stipend: toNumber(form.stipend),
     notes: form.notes.trim(),
+    payPeriodsPerYear: toNumber(form.payPeriodsPerYear),
+    isActive: form.isActive,
     effectiveDate: form.effectiveDate,
   };
 };
@@ -53,6 +62,13 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [search, setSearch] = useState("");
   const [form, setForm] = useState<PayrollFormState | null>(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [newEmployee, setNewEmployee] = useState({
+    name: "",
+    role: "",
+    department: "",
+  });
+  const [saveNotice, setSaveNotice] = useState("");
 
   useEffect(() => {
     const loadedEmployees = getEmployees(orgId);
@@ -81,26 +97,66 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
   );
 
   useEffect(() => {
-    if (!selectedEmployee) return;
+    if (!selectedEmployee || isCreatingNew) return;
     const profile = getPayrollProfile(orgId, selectedEmployee.id);
     setForm(profileToForm(profile));
   }, [orgId, selectedEmployee]);
 
   if (!form) {
-    return <div className="p-6">Loading…</div>;
+    return (
+      <div className="p-6">
+        <NativeMessage title="Loading payroll" body="Fetching the selected employee profile." />
+      </div>
+    );
   }
 
   function handleSelectEmployee(employeeId: string) {
+    if (isCreatingNew) {
+      setIsCreatingNew(false);
+      setNewEmployee({ name: "", role: "", department: "" });
+    }
     setSelectedEmployeeId(employeeId);
   }
 
   function handleCancel() {
+    if (isCreatingNew) {
+      setIsCreatingNew(false);
+      setNewEmployee({ name: "", role: "", department: "" });
+      const fallbackId = employees[0]?.id ?? "";
+      if (fallbackId) {
+        setSelectedEmployeeId(fallbackId);
+        const profile = getPayrollProfile(orgId, fallbackId);
+        setForm(profileToForm(profile));
+      }
+      return;
+    }
     if (!selectedEmployee) return;
     const profile = getPayrollProfile(orgId, selectedEmployee.id);
     setForm(profileToForm(profile));
   }
 
   function handleSave() {
+    if (isCreatingNew) {
+      const trimmed = {
+        name: newEmployee.name.trim(),
+        role: newEmployee.role.trim(),
+        department: newEmployee.department.trim(),
+      };
+      if (!trimmed.name || !trimmed.role || !trimmed.department) {
+        return;
+      }
+      const nextProfile = formToProfile(form);
+      const created = createEmployeeProfile(orgId, trimmed, nextProfile);
+      const refreshedEmployees = getEmployees(orgId);
+      setEmployees(refreshedEmployees);
+      setSelectedEmployeeId(created.id);
+      setIsCreatingNew(false);
+      setNewEmployee({ name: "", role: "", department: "" });
+      const refreshed = getPayrollProfile(orgId, created.id);
+      setForm(profileToForm(refreshed));
+      setSaveNotice("Profile created and saved.");
+      return;
+    }
     if (!selectedEmployee) return;
     const prevProfile = getPayrollProfile(orgId, selectedEmployee.id);
     const nextProfile = formToProfile(form);
@@ -108,6 +164,15 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
     updatePayrollProfile(orgId, selectedEmployee, prevProfile, nextProfile, actorName);
     const refreshed = getPayrollProfile(orgId, selectedEmployee.id);
     setForm(profileToForm(refreshed));
+    setSaveNotice("Changes saved.");
+  }
+
+  function handleCreateProfile() {
+    setIsCreatingNew(true);
+    setNewEmployee({ name: "", role: "", department: "" });
+    setSelectedEmployeeId("");
+    const blankProfile = getPayrollProfile(orgId, "__new__");
+    setForm(profileToForm(blankProfile));
   }
 
   return (
@@ -115,6 +180,13 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
       <div className="mb-6 text-center">
         <div className="text-2xl font-semibold">Payroll</div>
         <div className="text-sm opacity-70">Org: {orgName}</div>
+        <button
+          className="mt-3 text-sm underline opacity-80 hover:opacity-100"
+          type="button"
+          onClick={() => router.push("/dashboard")}
+        >
+          Back to dashboard
+        </button>
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row">
@@ -129,9 +201,14 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
+          <button className="btn btn-sm w-full" type="button" onClick={handleCreateProfile}>
+            Create Profile
+          </button>
           <div className="max-h-[420px] overflow-y-auto rounded-2xl border divide-y">
             {filteredEmployees.length === 0 ? (
-              <div className="p-6 text-sm opacity-70 text-center">No employees found.</div>
+              <div className="p-6">
+                <EmptyState title="No employees found" body="Try a different search term." />
+              </div>
             ) : (
               filteredEmployees.map((employee) => {
                 const isActive = employee.id === selectedEmployeeId;
@@ -158,7 +235,9 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
         <section className="lg:flex-1 rounded-2xl border p-6 space-y-4">
           <div>
             <div className="text-lg font-semibold">Payroll Details</div>
-            {selectedEmployee ? (
+            {isCreatingNew ? (
+              <div className="text-sm opacity-80 mt-1">Creating a new employee profile.</div>
+            ) : selectedEmployee ? (
               <div className="text-sm opacity-80 mt-1">
                 {selectedEmployee.name} · {selectedEmployee.role}
               </div>
@@ -166,6 +245,43 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
+            {isCreatingNew ? (
+              <>
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="text-xs uppercase tracking-wide opacity-70">Employee name</label>
+                  <input
+                    className="w-full rounded-xl border px-3 py-2"
+                    value={newEmployee.name}
+                    onChange={(event) =>
+                      setNewEmployee((prev) => ({ ...prev, name: event.target.value }))
+                    }
+                    placeholder="Ava Morales"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-wide opacity-70">Role</label>
+                  <input
+                    className="w-full rounded-xl border px-3 py-2"
+                    value={newEmployee.role}
+                    onChange={(event) =>
+                      setNewEmployee((prev) => ({ ...prev, role: event.target.value }))
+                    }
+                    placeholder="HR Manager"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-wide opacity-70">Department</label>
+                  <input
+                    className="w-full rounded-xl border px-3 py-2"
+                    value={newEmployee.department}
+                    onChange={(event) =>
+                      setNewEmployee((prev) => ({ ...prev, department: event.target.value }))
+                    }
+                    placeholder="People"
+                  />
+                </div>
+              </>
+            ) : null}
             <div className="space-y-2">
               <label className="text-xs uppercase tracking-wide opacity-70">Pay type</label>
               <select
@@ -182,13 +298,19 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-xs uppercase tracking-wide opacity-70">Effective date</label>
+              <label className="text-xs uppercase tracking-wide opacity-70">
+                Pay periods per year
+              </label>
               <input
                 className="w-full rounded-xl border px-3 py-2"
-                type="date"
-                value={form.effectiveDate}
+                type="number"
+                step="1"
+                min="1"
+                value={form.payPeriodsPerYear}
                 onChange={(event) =>
-                  setForm((prev) => (prev ? { ...prev, effectiveDate: event.target.value } : prev))
+                  setForm((prev) =>
+                    prev ? { ...prev, payPeriodsPerYear: event.target.value } : prev
+                  )
                 }
               />
             </div>
@@ -240,6 +362,40 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
                 }
               />
             </div>
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wide opacity-70">Effective date</label>
+              <input
+                className="w-full rounded-xl border px-3 py-2"
+                type="date"
+                value={form.effectiveDate}
+                onChange={(event) =>
+                  setForm((prev) => (prev ? { ...prev, effectiveDate: event.target.value } : prev))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wide opacity-70">Status</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className={`btn btn-sm w-full ${
+                    form.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : ""
+                  }`}
+                  onClick={() => setForm((prev) => (prev ? { ...prev, isActive: true } : prev))}
+                >
+                  Active
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm w-full ${
+                    !form.isActive ? "border-red-200 bg-red-50 text-red-700" : ""
+                  }`}
+                  onClick={() => setForm((prev) => (prev ? { ...prev, isActive: false } : prev))}
+                >
+                  Inactive
+                </button>
+              </div>
+            </div>
             <div className="space-y-2 sm:col-span-2">
               <label className="text-xs uppercase tracking-wide opacity-70">Notes</label>
               <textarea
@@ -254,15 +410,21 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
 
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
-              className="w-full rounded-xl border px-4 py-2 font-medium hover:bg-black/5"
+              className="btn btn-primary w-full"
               type="button"
               onClick={handleSave}
-              disabled={!selectedEmployee}
+              disabled={
+                isCreatingNew
+                  ? !newEmployee.name.trim() ||
+                    !newEmployee.role.trim() ||
+                    !newEmployee.department.trim()
+                  : !selectedEmployee
+              }
             >
               Save changes
             </button>
             <button
-              className="w-full rounded-xl border px-4 py-2 text-sm opacity-80 hover:opacity-100"
+              className="btn w-full"
               type="button"
               onClick={handleCancel}
               disabled={!selectedEmployee}
@@ -270,6 +432,11 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
               Cancel
             </button>
           </div>
+          {saveNotice ? (
+            <div className="mt-2">
+              <NativeMessage title={saveNotice} tone="success" />
+            </div>
+          ) : null}
         </section>
       </div>
     </main>

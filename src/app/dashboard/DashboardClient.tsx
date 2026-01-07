@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { loadPayrollState, PayrollChangeLog } from "@/lib/payroll/store";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const timeAgo = (iso: string) => {
   const delta = Date.now() - new Date(iso).getTime();
@@ -32,6 +33,9 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
   const [exportRange, setExportRange] = useState("7");
   const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
   const [exportNotice, setExportNotice] = useState("");
+  const [messages, setMessages] = useState<{ id: string; text: string; createdAt: string }[]>(
+    []
+  );
 
   useEffect(() => {
     const payrollState = loadPayrollState();
@@ -44,6 +48,18 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
     const stored = window.localStorage.getItem(`organizer_org_logo_${orgId}`);
     if (stored) {
       setLogoUrl(stored);
+    }
+  }, [orgId]);
+
+  useEffect(() => {
+    if (!orgId) return;
+    const stored = window.localStorage.getItem(`organizer_org_messages_${orgId}`);
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored) as { id: string; text: string; createdAt: string }[];
+      setMessages(parsed);
+    } catch {
+      setMessages([]);
     }
   }, [orgId]);
 
@@ -129,7 +145,7 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `payroll-changes-${days}d.csv`;
+    link.download = `payroll-changes-${days}d-excel.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -160,6 +176,23 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
       img.src = result;
     };
     reader.readAsDataURL(file);
+  }
+
+  function addMessage() {
+    const text = window.prompt("Add a message for your org:");
+    if (!text) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const next = [
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        text: trimmed,
+        createdAt: new Date().toISOString(),
+      },
+      ...messages,
+    ];
+    setMessages(next);
+    window.localStorage.setItem(`organizer_org_messages_${orgId}`, JSON.stringify(next));
   }
 
   return (
@@ -193,11 +226,28 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
           </div>
         </header>
 
-        <section className="rounded-2xl border p-4 text-center">
-          <div className="font-semibold">Message Board</div>
-          <div className="text-sm opacity-80 mt-1">
-            Welcome back, {email}. (Announcements will live here.)
+        <section className="rounded-2xl border p-4 text-center space-y-3">
+          <div className="flex flex-col items-center justify-between gap-2 sm:flex-row">
+            <div className="font-semibold">Message Board</div>
+            <button className="btn btn-sm" type="button" onClick={addMessage}>
+              Add message
+            </button>
           </div>
+          <div className="text-sm opacity-80">
+            Welcome back, {email}. Share quick updates with your org.
+          </div>
+          {messages.length === 0 ? (
+            <EmptyState title="No messages yet" body="Add the first update for your org." />
+          ) : (
+            <ul className="space-y-2 text-center">
+              {messages.map((message) => (
+                <li key={message.id} className="rounded-2xl border px-4 py-3 text-sm text-center">
+                  <div className="font-medium">{message.text}</div>
+                  <div className="text-xs opacity-60 mt-1">{timeAgo(message.createdAt)}</div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <section className="grid gap-3 md:grid-cols-3">
@@ -240,7 +290,7 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
         <section className="rounded-2xl border p-6 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-lg font-semibold">Payroll Change Tracker</div>
+            <div className="text-lg font-semibold">Upcoming Payroll Changes</div>
               <div className="text-sm opacity-80">Recent changes for {orgName}.</div>
             </div>
             <button
@@ -271,12 +321,12 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
                 value={exportFormat}
                 onChange={(event) => setExportFormat(event.target.value as "csv" | "pdf")}
               >
-                <option value="csv">CSV</option>
+                <option value="csv">Excel (CSV)</option>
                 <option value="pdf">PDF</option>
               </select>
             </div>
             <button
-              className="rounded-xl border px-4 py-2 text-sm opacity-80 hover:opacity-100"
+              className="btn btn-sm"
               onClick={() => exportPayrollChanges(Number(exportRange))}
             >
               Export
@@ -284,21 +334,32 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
           </div>
           {exportNotice ? <div className="text-xs opacity-70">{exportNotice}</div> : null}
           {payrollLogs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed p-6 text-sm opacity-70 text-center">
-              No payroll changes yet.
-            </div>
+            <EmptyState title="No payroll changes yet" body="Recent updates will appear here." />
           ) : (
             <ul className="space-y-2 text-sm">
               {payrollLogs.map((log) => {
                 const fieldsSummary = log.fieldsChanged.length
                   ? log.fieldsChanged.join(", ")
                   : log.summary;
+                const hasNoteChange = log.fieldsChanged.includes("Notes");
                 return (
                   <li key={log.id} className="rounded-2xl border px-4 py-3">
                     <div className="font-medium">{log.employeeName}</div>
                     <div className="text-xs opacity-70">
                       {fieldsSummary} · by {log.actorName} · {timeAgo(log.createdAt)}
                     </div>
+                    {hasNoteChange ? (
+                      <div className="mt-2 text-xs opacity-70 space-y-1">
+                        <div>
+                          <span className="font-semibold">Previous note:</span>{" "}
+                          {log.noteBefore?.trim() ? log.noteBefore : "—"}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Updated note:</span>{" "}
+                          {log.noteAfter?.trim() ? log.noteAfter : "—"}
+                        </div>
+                      </div>
+                    ) : null}
                   </li>
                 );
               })}

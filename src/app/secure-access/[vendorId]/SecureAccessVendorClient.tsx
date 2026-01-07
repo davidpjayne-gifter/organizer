@@ -11,6 +11,8 @@ import {
   Vendor,
   VendorActivityEvent,
 } from "@/lib/secure-access/store";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { NativeMessage } from "@/components/ui/NativeMessage";
 
 const maskPassword = (value: string) => "•".repeat(Math.max(value.length, 6));
 
@@ -79,19 +81,28 @@ export default function SecureAccessVendorClient() {
   if (notFound) {
     return (
       <main className="min-h-screen p-6">
-        <div className="rounded-2xl border p-6 space-y-3 max-w-xl">
-          <div className="text-xl font-semibold">Vendor not found</div>
-          <p className="text-sm opacity-80">We couldn’t locate that vendor profile.</p>
-          <Link className="text-sm underline" href="/secure-access">
-            Back to Secure Access Notes
-          </Link>
+        <div className="max-w-xl">
+          <NativeMessage
+            title="Vendor not found"
+            body="We couldn’t locate that vendor profile."
+            tone="warning"
+            actions={
+              <Link className="btn btn-sm" href="/secure-access">
+                Back to Secure Access Notes
+              </Link>
+            }
+          />
         </div>
       </main>
     );
   }
 
   if (!vendor) {
-    return <div className="p-6">Loading…</div>;
+    return (
+      <div className="p-6">
+        <NativeMessage title="Loading vendor" body="Fetching vendor profile details." />
+      </div>
+    );
   }
 
   function refresh() {
@@ -213,7 +224,7 @@ export default function SecureAccessVendorClient() {
           <div className="flex items-center justify-between">
             <div className="text-lg font-semibold">Vendor Details</div>
             <button
-              className="rounded-xl border px-4 py-2 text-sm"
+              className="btn btn-blue btn-sm"
               type="button"
               onClick={() => setEditing((prev) => !prev)}
             >
@@ -324,14 +335,14 @@ export default function SecureAccessVendorClient() {
           {editing ? (
             <div className="flex flex-col gap-2 sm:flex-row">
               <button
-                className="w-full rounded-xl border px-4 py-2 font-medium hover:bg-black/5"
+                className="btn btn-primary w-full"
                 type="button"
                 onClick={handleSave}
               >
                 Save changes
               </button>
               <button
-                className="w-full rounded-xl border px-4 py-2 text-sm opacity-80 hover:opacity-100"
+                className="btn w-full"
                 type="button"
                 onClick={handleCancel}
               >
@@ -344,9 +355,7 @@ export default function SecureAccessVendorClient() {
         <section className="rounded-2xl border p-6 space-y-4">
           <div className="text-lg font-semibold">Vendor Activity</div>
           {activityList.length === 0 ? (
-            <div className="rounded-2xl border border-dashed p-6 text-sm opacity-70">
-              No activity yet.
-            </div>
+            <EmptyState title="No activity yet" body="Vendor updates will appear here." />
           ) : (
             <div className="max-h-[360px] overflow-y-auto space-y-3">
               {activityList.map((event) => (
