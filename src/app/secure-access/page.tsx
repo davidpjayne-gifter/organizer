@@ -1,10 +1,16 @@
-export default function SecureAccessPage() {
-  return (
-    <main className="min-h-screen p-6">
-      <h1 className="text-2xl font-semibold">Secure Access Notes</h1>
-      <p className="mt-2 text-sm opacity-80">
-        Vendor directory + vendor profiles will live here. (No DB yet.)
-      </p>
-    </main>
-  );
+import { requireUserAndActiveOrg } from "@/lib/server/requireOrg";
+import SecureAccessClient from "./SecureAccessClient";
+
+export default async function SecureAccessPage() {
+  const { supabase, activeOrgId } = await requireUserAndActiveOrg();
+
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("id, name")
+    .eq("id", activeOrgId)
+    .single();
+
+  const orgName = org?.name ?? "";
+
+  return <SecureAccessClient orgId={activeOrgId} orgName={orgName} />;
 }
