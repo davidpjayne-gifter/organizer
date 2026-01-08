@@ -58,9 +58,7 @@ export async function getCurrentOrgId() {
 
   const memberships = await normalizeMemberships(supabase, user.id);
   if (memberships.length === 1) {
-    const orgId = memberships[0].org_id;
-    cookieStore.set("org_id", orgId, { path: "/", sameSite: "lax" });
-    return orgId;
+    return memberships[0].org_id;
   }
 
   return null;

@@ -116,6 +116,12 @@ export async function GET(request: Request) {
   if (!normalizedMemberships || normalizedMemberships.length === 0) {
     return NextResponse.redirect(new URL("/onboarding", url));
   } else {
+    if (normalizedMemberships.length === 1) {
+      cookieStore.set("org_id", normalizedMemberships[0].organization_id, {
+        path: "/",
+        sameSite: "lax",
+      });
+    }
     const { data: settings } = await writeClient
       .from("user_settings")
       .select("active_organization_id")
