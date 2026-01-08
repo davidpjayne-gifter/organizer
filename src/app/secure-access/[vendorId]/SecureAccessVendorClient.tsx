@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
+  deleteVendor,
   getWebsiteDomain,
   loadState,
   logVendorEvent,
@@ -31,6 +32,7 @@ const timeAgo = (iso: string) => {
 export default function SecureAccessVendorClient() {
   const params = useParams();
   const vendorId = params.vendorId as string;
+  const router = useRouter();
 
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [activity, setActivity] = useState<VendorActivityEvent[]>([]);
@@ -38,6 +40,7 @@ export default function SecureAccessVendorClient() {
   const [editing, setEditing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [copyStatus, setCopyStatus] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -197,6 +200,16 @@ export default function SecureAccessVendorClient() {
     });
   }
 
+  function handleDeleteVendor() {
+    if (!vendor) return;
+    deleteVendor(vendorId);
+    logVendorEvent(vendorId, {
+      action: "Vendor deleted",
+      actorName: "Admin",
+    });
+    router.push("/secure-access");
+  }
+
   return (
     <main className="min-h-screen p-6">
       <div className="space-y-6">
@@ -351,6 +364,45 @@ export default function SecureAccessVendorClient() {
               >
                 Cancel
               </button>
+            </div>
+          ) : null}
+          {editing ? (
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wide opacity-60">Delete vendor</label>
+              <div className="flex justify-end">
+                <button
+                  className="btn btn-sm border-red-200 bg-red-50 text-red-700"
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  Delete
+                </button>
+              </div>
+              {showDeleteConfirm ? (
+                <NativeMessage
+                  title="Are you sure?"
+                  body={`Delete ${vendor.name} from the database?`}
+                  tone="warning"
+                  actions={
+                    <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+                      <button
+                        className="btn btn-sm border-red-200 bg-red-50 text-red-700"
+                        type="button"
+                        onClick={handleDeleteVendor}
+                      >
+                        Yes, delete
+                      </button>
+                      <button
+                        className="btn btn-sm"
+                        type="button"
+                        onClick={() => setShowDeleteConfirm(false)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  }
+                />
+              ) : null}
             </div>
           ) : null}
         </section>

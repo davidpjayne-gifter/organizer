@@ -228,3 +228,15 @@ export const getVendorById = (vendorId: string) => {
   const state = loadState();
   return state.vendors.find((vendor) => vendor.id === vendorId) ?? null;
 };
+
+export const deleteVendor = (vendorId: string) => {
+  const state = loadState();
+  const nextVendors = state.vendors.filter((vendor) => vendor.id !== vendorId);
+  const { [vendorId]: _removed, ...nextActivity } = state.activityByVendorId;
+
+  saveState({
+    ...state,
+    vendors: nextVendors,
+    activityByVendorId: nextActivity,
+  });
+};
