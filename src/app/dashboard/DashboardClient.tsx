@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { loadPayrollState, PayrollChangeLog } from "@/lib/payroll/store";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { NativeMessage } from "@/components/ui/NativeMessage";
+import { InviteFormClient } from "@/app/settings/members/InviteFormClient";
+import { ReinviteButton } from "@/app/settings/members/ReinviteButton";
 
 const timeAgo = (iso: string) => {
   const delta = Date.now() - new Date(iso).getTime();
@@ -23,9 +25,25 @@ interface DashboardClientProps {
   orgId: string;
   orgName: string;
   email: string;
+  members: Array<{ user_id: string; role: string; created_at: string }>;
+  invites: Array<{
+    id: string;
+    email: string;
+    role: string;
+    created_at: string;
+    expires_at: string | null;
+  }>;
+  isOrgAdmin: boolean;
 }
 
-export default function DashboardClient({ orgId, orgName, email }: DashboardClientProps) {
+export default function DashboardClient({
+  orgId,
+  orgName,
+  email,
+  members,
+  invites,
+  isOrgAdmin,
+}: DashboardClientProps) {
   const router = useRouter();
   const supabase = supabaseBrowser();
   const [payrollLogs, setPayrollLogs] = useState<PayrollChangeLog[]>([]);
@@ -39,6 +57,7 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
   );
   const [showMessageForm, setShowMessageForm] = useState(false);
   const [messageDraft, setMessageDraft] = useState("");
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const payrollState = loadPayrollState();
@@ -214,22 +233,44 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
             </div>
             <div className="text-sm opacity-80 mt-1">My Profile: {email}</div>
           </div>
-          <div className="rounded-2xl border p-4 text-center space-y-3 sm:w-64 sm:absolute sm:right-0 sm:top-0">
-            <div className="font-semibold">Organization Logo</div>
+          <div className="sm:w-64 sm:absolute sm:right-0 sm:top-0">
             {logoUrl ? (
-              <div className="flex justify-center">
+              <div className="flex flex-col items-center gap-2">
                 <img
                   src={logoUrl}
                   alt={`${orgName} logo`}
-                  className="h-20 w-20 rounded-2xl border object-cover"
+                  className="h-20 w-20 rounded-xl border object-cover"
                 />
+                <button
+                  className="text-xs text-slate-600 underline"
+                  type="button"
+                  aria-label="Replace organization logo"
+                  onClick={() => logoInputRef.current?.click()}
+                >
+                  Replace
+                </button>
               </div>
             ) : (
-              <div className="text-sm opacity-70">Upload a logo for your organization.</div>
+              <div className="rounded-2xl border border-dashed p-4 text-center space-y-2">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-xl border border-dashed text-xs opacity-60">
+                  Logo
+                </div>
+                <div className="font-semibold">Add your logo</div>
+                <div className="text-xs opacity-70">Shown on your dashboard and exports.</div>
+                <button
+                  className="btn btn-sm w-full"
+                  type="button"
+                  aria-label="Add organization logo"
+                  onClick={() => logoInputRef.current?.click()}
+                >
+                  Add logo
+                </button>
+              </div>
             )}
-            {logoError ? <div className="text-sm text-red-600">{logoError}</div> : null}
+            {logoError ? <div className="text-sm text-red-600 mt-2">{logoError}</div> : null}
             <input
-              className="mx-auto block text-sm"
+              ref={logoInputRef}
+              className="hidden"
               type="file"
               accept="image/*"
               onChange={handleLogoUpload}
@@ -249,7 +290,7 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
             </button>
           </div>
           <div className="text-sm opacity-80">
-            Welcome back, {email}. Share quick updates with your org.
+            Welcome back, {email}. Share quick updates with your ORG.
           </div>
           {showMessageForm ? (
             <NativeMessage
@@ -262,7 +303,7 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
                     rows={3}
                     value={messageDraft}
                     onChange={(event) => setMessageDraft(event.target.value)}
-                    placeholder="Add a message for your org..."
+                    placeholder="Add a message for your ORG..."
                   />
                   <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
                     <button
@@ -292,19 +333,21 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
             />
           ) : null}
           {messages.length === 0 ? (
-            <EmptyState title="No messages yet" body="Add the first update for your org." />
+            <EmptyState title="No messages yet" body="Add the first update for your ORG." />
           ) : (
-            <ul className="space-y-2 text-center">
-              {messages.map((message) => (
-                <li
-                  key={message.id}
-                  className="border bg-white px-4 py-3 text-sm text-center shadow-[0_6px_16px_rgba(14,30,74,0.08)]"
-                >
-                  <div className="font-medium">{message.text}</div>
-                  <div className="text-xs opacity-60 mt-1">{timeAgo(message.createdAt)}</div>
-                </li>
-              ))}
-            </ul>
+            <div className="max-h-[240px] overflow-y-auto pr-1">
+              <ul className="space-y-2 text-center">
+                {messages.map((message) => (
+                  <li
+                    key={message.id}
+                    className="border bg-white px-4 py-3 text-sm text-center shadow-[0_6px_16px_rgba(14,30,74,0.08)]"
+                  >
+                    <div className="font-medium">{messages.length > 0 ? message.text : ""}</div>
+                    <div className="text-xs opacity-60 mt-1">{timeAgo(message.createdAt)}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </section>
 
@@ -412,6 +455,69 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
           )}
         </section>
       </div>
+
+      {isOrgAdmin ? (
+        <details className="rounded-2xl border p-6 mt-6">
+          <summary className="text-lg font-semibold cursor-pointer list-none">
+            Add users to {orgName}
+          </summary>
+          <div className="mt-4 space-y-6">
+            <div className="text-sm opacity-80">
+              Invite teammates and manage access for your organization.
+            </div>
+
+            <div className="rounded-2xl border p-4 space-y-4">
+              <div className="font-semibold">Invite a member</div>
+              <InviteFormClient />
+            </div>
+
+            <div className="rounded-2xl border p-4 space-y-4">
+              <div className="font-semibold">Pending invites</div>
+              {invites.length > 0 ? (
+                <div className="space-y-3">
+                  {invites.map((invite) => (
+                    <div key={invite.id} className="rounded-2xl border px-4 py-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="font-semibold">{invite.email}</div>
+                          <div className="text-xs opacity-70">
+                            Role: {invite.role} · Expires{" "}
+                            {invite.expires_at
+                              ? new Date(invite.expires_at).toLocaleString()
+                              : "—"}
+                          </div>
+                        </div>
+                        <ReinviteButton email={invite.email} role={invite.role} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState title="No pending invites" body="All invites have been accepted." />
+              )}
+            </div>
+
+            <div className="rounded-2xl border p-4 space-y-4">
+              <div className="font-semibold">Members</div>
+              {members.length > 0 ? (
+                <ul className="space-y-3">
+                  {members.map((member) => (
+                    <li key={member.user_id} className="rounded-2xl border px-4 py-3">
+                      <div className="font-semibold">{member.user_id}</div>
+                      <div className="text-xs opacity-70">
+                        Role: {member.role} · Added{" "}
+                        {new Date(member.created_at).toLocaleDateString()}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState title="No members yet" body="Invite someone to get started." />
+              )}
+            </div>
+          </div>
+        </details>
+      ) : null}
 
       <button
         className="mt-auto mx-auto text-sm underline opacity-80 hover:opacity-100"

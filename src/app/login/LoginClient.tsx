@@ -50,7 +50,7 @@ export default function LoginClient() {
         <form onSubmit={sendLink} className="mt-6 space-y-3">
           <input
             className="w-full rounded-xl border px-3 py-2"
-            placeholder="you@organization.org"
+            placeholder="you@ORG.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             type="email"

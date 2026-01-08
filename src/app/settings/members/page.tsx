@@ -95,7 +95,7 @@ export default async function MembersSettingsPage() {
         <section className="rounded-2xl border p-6 space-y-4">
           <div>
             <h2 className="text-lg font-semibold">Members</h2>
-            <p className="text-sm opacity-80 mt-1">People who have access to this org.</p>
+            <p className="text-sm opacity-80 mt-1">People who have access to this ORG.</p>
           </div>
           {members && members.length > 0 ? (
             <ul className="space-y-3">

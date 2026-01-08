@@ -205,7 +205,7 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
     <main className="min-h-screen p-6">
       <div className="mb-6 text-center">
         <div className="text-2xl font-semibold">Payroll</div>
-        <div className="text-sm opacity-70">Org: {orgName}</div>
+        <div className="text-sm opacity-70">ORG: {orgName}</div>
         <button
           className="mt-3 text-sm underline opacity-80 hover:opacity-100"
           type="button"
