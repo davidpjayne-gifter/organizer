@@ -321,7 +321,7 @@ export default function SecureAccessVendorClient() {
               {editing ? (
                 <input
                   className="w-full rounded-xl border px-3 py-2"
-                  type="password"
+                  type="text"
                   value={form.password}
                   onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
                 />
@@ -379,29 +379,31 @@ export default function SecureAccessVendorClient() {
                 </button>
               </div>
               {showDeleteConfirm ? (
-                <NativeMessage
-                  title="Are you sure?"
-                  body={`Delete ${vendor.name} from the database?`}
-                  tone="warning"
-                  actions={
-                    <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
-                      <button
-                        className="btn btn-sm border-red-200 bg-red-50 text-red-700"
-                        type="button"
-                        onClick={handleDeleteVendor}
-                      >
-                        Yes, delete
-                      </button>
-                      <button
-                        className="btn btn-sm"
-                        type="button"
-                        onClick={() => setShowDeleteConfirm(false)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  }
-                />
+                <div className="text-center">
+                  <NativeMessage
+                    title="Are you sure?"
+                    body={`Delete ${vendor.name} from the database?`}
+                    tone="warning"
+                    actions={
+                      <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+                        <button
+                          className="btn btn-sm border-red-200 bg-red-50 text-red-700"
+                          type="button"
+                          onClick={handleDeleteVendor}
+                        >
+                          Yes, delete
+                        </button>
+                        <button
+                          className="btn btn-sm"
+                          type="button"
+                          onClick={() => setShowDeleteConfirm(false)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    }
+                  />
+                </div>
               ) : null}
             </div>
           ) : null}
