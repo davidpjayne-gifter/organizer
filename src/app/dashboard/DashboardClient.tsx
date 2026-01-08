@@ -382,27 +382,27 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
                     ? log.fieldsChanged.join(", ")
                     : log.summary;
                   const hasNoteChange = log.fieldsChanged.includes("Notes");
-                  return (
-                    <li key={log.id} className="rounded-2xl border px-4 py-3">
-                      <div className="font-medium">{log.employeeName}</div>
-                      <div className="text-xs opacity-70">
-                        {fieldsSummary} · by {log.actorName} · {timeAgo(log.createdAt)}
-                      </div>
-                      {hasNoteChange ? (
-                        <div className="mt-2 text-xs opacity-70 space-y-1">
-                          <div>
-                            <span className="font-semibold">Previous note:</span>{" "}
-                            {log.noteBefore?.trim() ? log.noteBefore : "—"}
-                          </div>
-                          <div>
-                            <span className="font-semibold">Updated note:</span>{" "}
-                            {log.noteAfter?.trim() ? log.noteAfter : "—"}
-                          </div>
+                return (
+                  <li key={log.id} className="rounded-2xl border px-4 py-3">
+                    <div className="font-medium">{log.employeeName}</div>
+                    <div className="text-xs opacity-70">
+                      {fieldsSummary} · by {log.actorName} · {timeAgo(log.createdAt)}
+                    </div>
+                    {hasNoteChange ? (
+                      <div className="mt-3 text-xs opacity-70 space-y-1">
+                        <div>
+                          <span className="font-semibold">Updated note:</span>{" "}
+                          {log.noteAfter?.trim() ? log.noteAfter : "—"}
                         </div>
-                      ) : null}
-                    </li>
-                  );
-                })}
+                        <div>
+                          <span className="font-semibold">Previous note:</span>{" "}
+                          {log.noteBefore?.trim() ? log.noteBefore : "—"}
+                        </div>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
               </ul>
             </div>
           )}

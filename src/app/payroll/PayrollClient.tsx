@@ -112,14 +112,6 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
     setForm(profileToForm(profile));
   }, [orgId, selectedEmployee]);
 
-  if (!form) {
-    return (
-      <div className="p-6">
-        <NativeMessage title="Loading payroll" body="Fetching the selected employee profile." />
-      </div>
-    );
-  }
-
   function handleSelectEmployee(employeeId: string) {
     if (isCreatingNew) {
       setIsCreatingNew(false);
@@ -157,7 +149,7 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
         return;
       }
       const nextProfile = formToProfile(form);
-      const created = createEmployeeProfile(orgId, trimmed, nextProfile);
+      const created = createEmployeeProfile(orgId, trimmed, nextProfile, actorName);
       const refreshedEmployees = getEmployees(orgId);
       setEmployees(refreshedEmployees);
       setSelectedEmployeeId(created.id);
@@ -284,7 +276,23 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
 
         <section className="lg:flex-1 rounded-2xl border p-6 space-y-4">
           <div>
-            <div className="text-lg font-semibold">Payroll Details</div>
+            <div className="flex items-center justify-between">
+              <div className="text-lg font-semibold">Payroll Details</div>
+              {selectedEmployee || isCreatingNew ? (
+                <button
+                  className="btn btn-sm"
+                  type="button"
+                  onClick={() => {
+                    setSelectedEmployeeId("");
+                    setForm(null);
+                    setIsCreatingNew(false);
+                  }}
+                  aria-label="Close payroll details"
+                >
+                  ✕
+                </button>
+              ) : null}
+            </div>
             {isCreatingNew ? (
               <div className="text-sm opacity-80 mt-1">Creating a new employee profile.</div>
             ) : selectedEmployee ? (
@@ -294,7 +302,13 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
             ) : null}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          {!form ? (
+            <NativeMessage
+              title="Select an employee"
+              body="Choose a profile from the list to view or edit details."
+            />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
             {isCreatingNew ? (
               <>
                 <div className="space-y-2 sm:col-span-2">
@@ -470,8 +484,10 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
               />
             </div>
           </div>
+          )}
 
-          <div className="flex flex-col gap-2 sm:flex-row">
+          {form ? (
+            <div className="flex flex-col gap-2 sm:flex-row">
             <button
               className="btn btn-primary w-full"
               type="button"
@@ -494,7 +510,8 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
             >
               Cancel
             </button>
-          </div>
+            </div>
+          ) : null}
           {deleteCandidate ? (
             <div className="mt-3">
               <NativeMessage

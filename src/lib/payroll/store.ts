@@ -283,7 +283,8 @@ export const updatePayrollProfile = (
 export const createEmployeeProfile = (
   orgId: string,
   employeeInput: Omit<Employee, "id">,
-  profile: PayrollProfile
+  profile: PayrollProfile,
+  actorName: string
 ) => {
   const state = ensureOrgInitialized(orgId, loadPayrollState());
   const employee: Employee = {
@@ -302,6 +303,28 @@ export const createEmployeeProfile = (
     },
   };
 
+  const noteText = profile.notes.trim();
+  const fieldsChanged = noteText ? ["Profile created", "Notes"] : ["Profile created"];
+  const log: PayrollChangeLog = {
+    id: createId(),
+    orgId,
+    employeeId: employee.id,
+    employeeName: employee.name,
+    actorName,
+    createdAt: new Date().toISOString(),
+    summary: "Profile created",
+    fieldsChanged,
+    changeType: "General",
+    noteBefore: noteText ? "" : undefined,
+    noteAfter: noteText ? profile.notes : undefined,
+  };
+
+  const existing = state.payrollChangeLogByOrgId[orgId] ?? [];
+  const nextLogByOrg = {
+    ...state.payrollChangeLogByOrgId,
+    [orgId]: [log, ...existing],
+  };
+
   const nextState: PayrollState = {
     ...state,
     employeesByOrgId: {
@@ -309,6 +332,7 @@ export const createEmployeeProfile = (
       [orgId]: nextEmployees,
     },
     payrollByOrgId: nextPayrollByOrg,
+    payrollChangeLogByOrgId: nextLogByOrg,
   };
 
   savePayrollState(nextState);
