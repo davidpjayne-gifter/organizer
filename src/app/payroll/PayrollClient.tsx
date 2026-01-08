@@ -170,6 +170,12 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
     setSaveNotice("Changes saved.");
   }
 
+  useEffect(() => {
+    if (!saveNotice) return;
+    const timeout = setTimeout(() => setSaveNotice(""), 5000);
+    return () => clearTimeout(timeout);
+  }, [saveNotice]);
+
   function handleCreateProfile() {
     setIsCreatingNew(true);
     setNewEmployee({ name: "", role: "", department: "" });
