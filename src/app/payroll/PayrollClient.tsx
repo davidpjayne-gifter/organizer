@@ -80,6 +80,12 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
     if (initialEmployeeId) {
       const profile = getPayrollProfile(orgId, initialEmployeeId);
       setForm(profileToForm(profile));
+      setIsCreatingNew(false);
+    } else {
+      setIsCreatingNew(true);
+      setNewEmployee({ name: "", role: "", department: "" });
+      const blankProfile = getPayrollProfile(orgId, "__new__");
+      setForm(profileToForm(blankProfile));
     }
 
     setEmployees(loadedEmployees);

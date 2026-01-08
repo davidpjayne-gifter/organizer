@@ -40,6 +40,7 @@ export default function SecureAccessClient({ orgId, orgName }: SecureAccessClien
   useEffect(() => {
     const state = loadState();
     setVendors(state.vendors);
+    setShowCreateForm(state.vendors.length === 0);
   }, []);
 
   useEffect(() => {
