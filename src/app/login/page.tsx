@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { NativeMessage } from "@/components/ui/NativeMessage";
 
 export default function LoginPage() {
   const supabase = supabaseBrowser();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -15,10 +17,19 @@ export default function LoginPage() {
     setStatus("sending");
     setMessage("");
 
+    const redirectPath = searchParams.get("redirect");
+    const safeRedirect =
+      redirectPath && redirectPath.startsWith("/") && !redirectPath.startsWith("//")
+        ? redirectPath
+        : null;
+    const redirectQuery = safeRedirect
+      ? `?redirect=${encodeURIComponent(safeRedirect)}`
+      : "";
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback${redirectQuery}`,
       },
     });
 

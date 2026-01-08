@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getCurrentOrgId, getOrgRole } from "@/lib/org";
 
 export async function requireUserAndActiveOrg() {
   const cookieStore = await cookies();
@@ -24,19 +25,24 @@ export async function requireUserAndActiveOrg() {
     redirect("/login");
   }
 
-  const { data: settings, error } = await supabase
-    .from("user_settings")
-    .select("active_organization_id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (error || !settings?.active_organization_id) {
-    redirect("/onboarding");
+  const activeOrgId = await getCurrentOrgId();
+  if (!activeOrgId) {
+    redirect("/access");
   }
+
+  const role = await getOrgRole(activeOrgId);
+  if (!role) {
+    redirect("/access");
+  }
+
+  await supabase.from("user_settings").upsert({
+    user_id: user.id,
+    active_organization_id: activeOrgId,
+  });
 
   return {
     supabase,
     user,
-    activeOrgId: settings.active_organization_id as string,
+    activeOrgId: activeOrgId as string,
   };
 }

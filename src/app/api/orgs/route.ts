@@ -70,6 +70,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unable to create organization." }, { status: 500 });
   }
 
+  const { error: orgMemberErr } = await admin.from("org_members").insert({
+    org_id: org.id,
+    user_id: user.id,
+    role: "owner",
+  });
+
+  if (orgMemberErr) {
+    console.error("org_member_create_failed", orgMemberErr);
+    return NextResponse.json({ error: "Unable to create organization." }, { status: 500 });
+  }
+
   const { error: settingsErr } = await admin.from("user_settings").upsert({
     user_id: user.id,
     active_organization_id: org.id,

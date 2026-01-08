@@ -86,12 +86,34 @@ export async function GET(request: Request) {
       { onConflict: "id" }
     );
 
+  const redirectTarget = url.searchParams.get("redirect");
+  if (
+    redirectTarget &&
+    redirectTarget.startsWith("/") &&
+    !redirectTarget.startsWith("//")
+  ) {
+    return NextResponse.redirect(new URL(redirectTarget, url));
+  }
+
   const { data: memberships } = await writeClient
-    .from("organization_members")
-    .select("organization_id")
+    .from("org_members")
+    .select("org_id")
     .eq("user_id", user.id);
 
-  if (!memberships || memberships.length === 0) {
+  let normalizedMemberships =
+    memberships && memberships.length > 0
+      ? memberships.map((row) => ({ organization_id: row.org_id }))
+      : null;
+
+  if (!normalizedMemberships || normalizedMemberships.length === 0) {
+    const { data: legacy } = await writeClient
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", user.id);
+    normalizedMemberships = legacy ?? null;
+  }
+
+  if (!normalizedMemberships || normalizedMemberships.length === 0) {
     return NextResponse.redirect(new URL("/onboarding", url));
   } else {
     const { data: settings } = await writeClient
@@ -103,7 +125,7 @@ export async function GET(request: Request) {
     if (!settings?.active_organization_id) {
       await writeClient.from("user_settings").upsert({
         user_id: user.id,
-        active_organization_id: memberships[0].organization_id,
+        active_organization_id: normalizedMemberships[0].organization_id,
       });
     }
   }
