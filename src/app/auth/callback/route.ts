@@ -6,6 +6,13 @@ import { cookies } from "next/headers";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
+  const tokenHash = url.searchParams.get("token_hash") ?? url.searchParams.get("token");
+  const otpType = url.searchParams.get("type") as
+    | "magiclink"
+    | "recovery"
+    | "email_change"
+    | "invite"
+    | null;
   const cookieStore = await cookies();
 
   const supabase = createServerClient(
@@ -28,6 +35,15 @@ export async function GET(request: Request) {
   let exchangeSession = null;
   if (code) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      return NextResponse.redirect(new URL("/login?error=auth_callback", url));
+    }
+    exchangeSession = data.session;
+  } else if (tokenHash && otpType) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      type: otpType,
+      token_hash: tokenHash,
+    });
     if (error) {
       return NextResponse.redirect(new URL("/login?error=auth_callback", url));
     }
