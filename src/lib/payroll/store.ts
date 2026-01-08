@@ -14,6 +14,7 @@ export interface PayrollProfile {
   notes: string;
   payPeriodsPerYear: number;
   isActive: boolean;
+  departmentRates: { department: string; hourlyRate: number }[];
   effectiveDate: string;
 }
 
@@ -65,6 +66,7 @@ const defaultProfileFor = (employee: Employee): PayrollProfile => {
       notes: "",
       payPeriodsPerYear: 26,
       isActive: true,
+      departmentRates: [],
       effectiveDate: new Date().toISOString().slice(0, 10),
     };
   }
@@ -78,6 +80,7 @@ const defaultProfileFor = (employee: Employee): PayrollProfile => {
     notes: "",
     payPeriodsPerYear: 26,
     isActive: true,
+    departmentRates: [{ department: employee.department, hourlyRate: 42 }],
     effectiveDate: new Date().toISOString().slice(0, 10),
   };
 };
@@ -178,6 +181,7 @@ export const getPayrollProfile = (orgId: string, employeeId: string): PayrollPro
           ? profile.payPeriodsPerYear
           : 26,
       isActive: typeof profile.isActive === "boolean" ? profile.isActive : true,
+      departmentRates: Array.isArray(profile.departmentRates) ? profile.departmentRates : [],
       notes: profile.notes ?? "",
     };
   }
@@ -190,6 +194,7 @@ export const getPayrollProfile = (orgId: string, employeeId: string): PayrollPro
     notes: "",
     payPeriodsPerYear: 26,
     isActive: true,
+    departmentRates: [],
     effectiveDate: new Date().toISOString().slice(0, 10),
   };
 };
@@ -204,6 +209,9 @@ const diffFields = (prev: PayrollProfile, next: PayrollProfile) => {
   if (prev.notes !== next.notes) changes.push("Notes");
   if (prev.payPeriodsPerYear !== next.payPeriodsPerYear) changes.push("Pay periods per year");
   if (prev.isActive !== next.isActive) changes.push("Employment status");
+  if (JSON.stringify(prev.departmentRates) !== JSON.stringify(next.departmentRates)) {
+    changes.push("Department rates");
+  }
   if (prev.effectiveDate !== next.effectiveDate) changes.push("Effective date");
   return changes;
 };

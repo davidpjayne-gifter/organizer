@@ -23,6 +23,7 @@ interface PayrollFormState {
   notes: string;
   payPeriodsPerYear: string;
   isActive: boolean;
+  departmentRates: { department: string; hourlyRate: string }[];
   effectiveDate: string;
 }
 
@@ -35,20 +36,35 @@ const profileToForm = (profile: PayrollProfile): PayrollFormState => ({
   notes: profile.notes,
   payPeriodsPerYear: profile.payPeriodsPerYear.toString(),
   isActive: profile.isActive ?? true,
+  departmentRates:
+    profile.departmentRates && profile.departmentRates.length > 0
+      ? profile.departmentRates.map((item) => ({
+          department: item.department,
+          hourlyRate: item.hourlyRate.toString(),
+        }))
+      : [{ department: "", hourlyRate: profile.hourlyRate.toString() }],
   effectiveDate: profile.effectiveDate,
 });
 
 const formToProfile = (form: PayrollFormState): PayrollProfile => {
   const toNumber = (value: string) => (value.trim() === "" ? 0 : Number(value));
+  const departmentRates = form.departmentRates
+    .map((item) => ({
+      department: item.department.trim(),
+      hourlyRate: toNumber(item.hourlyRate),
+    }))
+    .filter((item) => item.department !== "" || item.hourlyRate !== 0);
+  const primaryRate = departmentRates[0]?.hourlyRate ?? 0;
   return {
     payType: form.payType,
-    hourlyRate: toNumber(form.hourlyRate),
+    hourlyRate: primaryRate || toNumber(form.hourlyRate),
     salaryAmount: toNumber(form.salaryAmount),
     ptoAccrualRate: toNumber(form.ptoAccrualRate),
     stipend: toNumber(form.stipend),
     notes: form.notes.trim(),
     payPeriodsPerYear: toNumber(form.payPeriodsPerYear),
     isActive: form.isActive,
+    departmentRates,
     effectiveDate: form.effectiveDate,
   };
 };
@@ -111,6 +127,64 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
     const profile = getPayrollProfile(orgId, selectedEmployee.id);
     setForm(profileToForm(profile));
   }, [orgId, selectedEmployee]);
+
+  useEffect(() => {
+    if (!form || !isCreatingNew) return;
+    if (form.departmentRates.length === 0) return;
+    if (form.departmentRates[0].department || !newEmployee.department.trim()) return;
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            departmentRates: prev.departmentRates.map((item, index) =>
+              index === 0 ? { ...item, department: newEmployee.department.trim() } : item
+            ),
+          }
+        : prev
+    );
+  }, [form, isCreatingNew, newEmployee.department]);
+
+  function addDepartmentRate() {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            departmentRates: [...prev.departmentRates, { department: "", hourlyRate: "" }],
+          }
+        : prev
+    );
+  }
+
+  function updateDepartmentRate(
+    index: number,
+    patch: Partial<{ department: string; hourlyRate: string }>
+  ) {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            departmentRates: prev.departmentRates.map((item, idx) =>
+              idx === index ? { ...item, ...patch } : item
+            ),
+          }
+        : prev
+    );
+  }
+
+  const [pendingRemoveIndex, setPendingRemoveIndex] = useState<number | null>(null);
+  const [showRateEdit, setShowRateEdit] = useState(false);
+
+  function removeDepartmentRate(index: number) {
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            departmentRates: prev.departmentRates.filter((_, idx) => idx !== index),
+          }
+        : prev
+    );
+    setPendingRemoveIndex(null);
+  }
 
   function handleSelectEmployee(employeeId: string) {
     if (isCreatingNew) {
@@ -384,30 +458,20 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
                 }
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-xs uppercase tracking-wide opacity-70">Hourly rate</label>
-              <input
-                className="w-full rounded-xl border px-3 py-2"
-                type="number"
-                step="0.01"
-                value={form.hourlyRate}
-                onChange={(event) =>
-                  setForm((prev) => (prev ? { ...prev, hourlyRate: event.target.value } : prev))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs uppercase tracking-wide opacity-70">Salary amount</label>
-              <input
-                className="w-full rounded-xl border px-3 py-2"
-                type="number"
-                step="0.01"
-                value={form.salaryAmount}
-                onChange={(event) =>
-                  setForm((prev) => (prev ? { ...prev, salaryAmount: event.target.value } : prev))
-                }
-              />
-            </div>
+            {form.payType === "Salary" ? (
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-wide opacity-70">Salary amount</label>
+                <input
+                  className="w-full rounded-xl border px-3 py-2"
+                  type="number"
+                  step="0.01"
+                  value={form.salaryAmount}
+                  onChange={(event) =>
+                    setForm((prev) => (prev ? { ...prev, salaryAmount: event.target.value } : prev))
+                  }
+                />
+              </div>
+            ) : null}
             <div className="space-y-2">
               <label className="text-xs uppercase tracking-wide opacity-70">PTO accrual rate</label>
               <input
@@ -431,6 +495,83 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
                   setForm((prev) => (prev ? { ...prev, stipend: event.target.value } : prev))
                 }
               />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <label className="text-xs uppercase tracking-wide opacity-70">
+                Departments & hourly rates {form.payType === "Salary" ? "(optional)" : ""}
+              </label>
+              <div className="space-y-2">
+                {form.departmentRates.map((item, index) => (
+                  <div key={index} className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      className="w-full rounded-xl border px-3 py-2"
+                      placeholder="Department"
+                      value={item.department}
+                      onChange={(event) =>
+                        updateDepartmentRate(index, { department: event.target.value })
+                      }
+                    />
+                    <input
+                      className="w-full rounded-xl border px-3 py-2"
+                      placeholder="Hourly rate"
+                      type="number"
+                      step="0.01"
+                      value={item.hourlyRate}
+                      onChange={(event) =>
+                        updateDepartmentRate(index, { hourlyRate: event.target.value })
+                      }
+                    />
+                    {showRateEdit && form.departmentRates.length > 1 ? (
+                      <button
+                        className="btn btn-sm px-2"
+                        type="button"
+                        onClick={() => setPendingRemoveIndex(index)}
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+                <button className="btn btn-sm" type="button" onClick={addDepartmentRate}>
+                  Add department
+                </button>
+                <button
+                  className="btn btn-sm"
+                  type="button"
+                  onClick={() => setShowRateEdit((prev) => !prev)}
+                >
+                  {showRateEdit ? "Done" : "Edit"}
+                </button>
+              </div>
+              {pendingRemoveIndex !== null ? (
+                <div className="mt-3 text-center">
+                  <NativeMessage
+                    title="Are you sure?"
+                    body="Remove this department rate?"
+                    tone="warning"
+                    actions={
+                      <div className="flex w-full flex-col items-center gap-2 sm:flex-row sm:justify-center">
+                        <button
+                          className="btn btn-sm"
+                          type="button"
+                          onClick={() => removeDepartmentRate(pendingRemoveIndex)}
+                        >
+                          Yes, remove
+                        </button>
+                        <button
+                          className="btn btn-sm"
+                          type="button"
+                          onClick={() => setPendingRemoveIndex(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    }
+                  />
+                </div>
+              ) : null}
             </div>
             <div className="space-y-2">
               <label className="text-xs uppercase tracking-wide opacity-70">Effective date</label>
