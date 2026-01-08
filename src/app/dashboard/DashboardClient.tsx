@@ -133,10 +133,14 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
     }
 
     const rows = [
-      ["Employee", "Fields Changed", "Actor", "Timestamp"].join(","),
+      ["Employee", "Note (Updated)", "Note (Previous)", "Fields Changed", "Actor", "Timestamp"].join(
+        ","
+      ),
       ...filtered.map((log) =>
         [
           `"${log.employeeName}"`,
+          `"${log.noteAfter ?? ""}"`,
+          `"${log.noteBefore ?? ""}"`,
           `"${log.fieldsChanged.join("; ")}"`,
           `"${log.actorName}"`,
           `"${log.createdAt}"`,
