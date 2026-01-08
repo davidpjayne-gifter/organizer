@@ -319,3 +319,26 @@ export const createEmployeeProfile = (
   savePayrollState(nextState);
   return employee;
 };
+
+export const deleteEmployeeProfile = (orgId: string, employeeId: string) => {
+  const state = ensureOrgInitialized(orgId, loadPayrollState());
+  const employees = state.employeesByOrgId[orgId] ?? [];
+  const nextEmployees = employees.filter((employee) => employee.id !== employeeId);
+
+  const nextPayrollByOrg = { ...state.payrollByOrgId[orgId] };
+  delete nextPayrollByOrg[employeeId];
+
+  const nextState: PayrollState = {
+    ...state,
+    employeesByOrgId: {
+      ...state.employeesByOrgId,
+      [orgId]: nextEmployees,
+    },
+    payrollByOrgId: {
+      ...state.payrollByOrgId,
+      [orgId]: nextPayrollByOrg,
+    },
+  };
+
+  savePayrollState(nextState);
+};

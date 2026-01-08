@@ -1,18 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --border: #cbd5f5;
-  --input: #cbd5f5;
+  --background: #eef2f8;
+  --foreground: #0b1b3b;
+  --muted: #e6edf7;
+  --muted-foreground: #5b6c86;
+  --card: #f7f9fc;
+  --card-foreground: #0b1b3b;
+  --border: #b9c7dd;
+  --input: #b9c7dd;
   --primary: #2563eb;
   --primary-foreground: #ffffff;
   --secondary: #f8fafc;
-  --secondary-foreground: #0f172a;
+  --secondary-foreground: #0b1b3b;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
 }
@@ -60,11 +60,26 @@
   select {
     border-color: var(--input);
   }
+  main {
+    background: var(--background);
+  }
 }
 
 @layer components {
+  .rounded-2xl.border {
+    background: var(--card);
+    box-shadow: 0 10px 30px rgba(14, 30, 74, 0.08);
+    transition: border-color 160ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .rounded-2xl.border:hover {
+    border-color: #9fb3d6;
+    box-shadow: 0 14px 34px rgba(14, 30, 74, 0.12);
+    transform: translateY(-1px);
+  }
+
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-colors;
+    @apply inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-[0_6px_16px_rgba(14,30,74,0.12)] transition;
     background: var(--background);
     color: var(--foreground);
     border-color: var(--border);
@@ -72,6 +87,8 @@
 
   .btn:hover {
     background: rgba(15, 23, 42, 0.04);
+    box-shadow: 0 10px 22px rgba(14, 30, 74, 0.18);
+    transform: translateY(-1px);
   }
 
   .btn:disabled {
@@ -114,8 +131,13 @@
   }
 }
 
+html,
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+main {
+  background: var(--background);
 }

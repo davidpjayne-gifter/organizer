@@ -76,38 +76,7 @@ export async function GET(request: Request) {
     .eq("user_id", user.id);
 
   if (!memberships || memberships.length === 0) {
-    const orgNameFromMeta = user.user_metadata?.org_name as string | undefined;
-    const fullName = user.user_metadata?.full_name as string | undefined;
-    const orgName = orgNameFromMeta ?? (fullName ? `${fullName}'s Org` : "My Organization");
-
-    const { data: org, error: orgErr } = await writeClient
-      .from("organizations")
-      .insert({ name: orgName, created_by: user.id })
-      .select("id")
-      .single();
-
-    if (orgErr || !org?.id) {
-      console.error("org_create_failed", orgErr);
-      const reason = encodeURIComponent(orgErr?.message ?? "unknown");
-      return NextResponse.redirect(new URL(`/login?error=org_create&reason=${reason}`, url));
-    }
-
-    const { error: memberErr } = await writeClient.from("organization_members").insert({
-      organization_id: org.id,
-      user_id: user.id,
-      role: "owner",
-    });
-
-    if (memberErr) {
-      console.error("member_create_failed", memberErr);
-      const reason = encodeURIComponent(memberErr?.message ?? "unknown");
-      return NextResponse.redirect(new URL(`/login?error=member_create&reason=${reason}`, url));
-    }
-
-    await writeClient.from("user_settings").upsert({
-      user_id: user.id,
-      active_organization_id: org.id,
-    });
+    return NextResponse.redirect(new URL("/onboarding", url));
   } else {
     const { data: settings } = await writeClient
       .from("user_settings")

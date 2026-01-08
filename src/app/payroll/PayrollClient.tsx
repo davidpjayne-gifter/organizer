@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Employee,
   createEmployeeProfile,
+  deleteEmployeeProfile,
   getEmployees,
   getPayrollProfile,
   PayrollProfile,
@@ -71,6 +72,7 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
     department: "",
   });
   const [saveNotice, setSaveNotice] = useState("");
+  const [deleteCandidate, setDeleteCandidate] = useState<Employee | null>(null);
 
   useEffect(() => {
     const loadedEmployees = getEmployees(orgId);
@@ -178,6 +180,23 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
     setForm(profileToForm(blankProfile));
   }
 
+  function handleConfirmDelete() {
+    if (!deleteCandidate) return;
+    deleteEmployeeProfile(orgId, deleteCandidate.id);
+    const refreshedEmployees = getEmployees(orgId);
+    setEmployees(refreshedEmployees);
+    setDeleteCandidate(null);
+    const fallbackId = refreshedEmployees[0]?.id ?? "";
+    if (fallbackId) {
+      setSelectedEmployeeId(fallbackId);
+      const profile = getPayrollProfile(orgId, fallbackId);
+      setForm(profileToForm(profile));
+    } else {
+      setSelectedEmployeeId("");
+      setForm(null);
+    }
+  }
+
   return (
     <main className="min-h-screen p-6">
       <div className="mb-6 text-center">
@@ -216,19 +235,41 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
               filteredEmployees.map((employee) => {
                 const isActive = employee.id === selectedEmployeeId;
                 return (
-                  <button
+                  <div
                     key={employee.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => handleSelectEmployee(employee.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        handleSelectEmployee(employee.id);
+                      }
+                    }}
                     className={`w-full text-left p-4 transition ${
                       isActive ? "bg-black/10" : "hover:bg-black/5"
                     }`}
                   >
-                    <div className="font-semibold">{employee.name}</div>
-                    <div className="text-xs opacity-70">
-                      {employee.role} · {employee.department}
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="font-semibold">{employee.name}</div>
+                        <div className="text-xs opacity-70">
+                          {employee.role} · {employee.department}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="btn btn-sm"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleSelectEmployee(employee.id);
+                          }}
+                        >
+                          Edit
+                        </button>
+                      </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })
             )}
@@ -398,6 +439,19 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
                   Inactive
                 </button>
               </div>
+              <div className="flex justify-end">
+                <button
+                  className="btn btn-sm border-red-200 bg-red-50 text-red-700"
+                  type="button"
+                  disabled={!selectedEmployee}
+                  onClick={() => {
+                    if (!selectedEmployee) return;
+                    setDeleteCandidate(selectedEmployee);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
             <div className="space-y-2 sm:col-span-2">
               <label className="text-xs uppercase tracking-wide opacity-70">Notes</label>
@@ -435,6 +489,33 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
               Cancel
             </button>
           </div>
+          {deleteCandidate ? (
+            <div className="mt-3">
+              <NativeMessage
+                title="Are you sure?"
+                body={`Delete ${deleteCandidate.name} from the database?`}
+                tone="warning"
+                actions={
+                  <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+                    <button
+                      className="btn btn-sm border-red-200 bg-red-50 text-red-700"
+                      type="button"
+                      onClick={handleConfirmDelete}
+                    >
+                      Yes, delete
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      type="button"
+                      onClick={() => setDeleteCandidate(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                }
+              />
+            </div>
+          ) : null}
           {saveNotice ? (
             <div className="mt-2">
               <NativeMessage title={saveNotice} tone="success" />

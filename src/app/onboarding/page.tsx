@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/browser";
-import { createOrg, ensureUserHasOrgOrNull } from "@/lib/org/store";
 import { NativeMessage } from "@/components/ui/NativeMessage";
 
 export default function OnboardingPage() {
@@ -24,8 +23,13 @@ export default function OnboardingPage() {
       }
 
       setUser({ id: currentUser.id, email: currentUser.email });
-      const { selectedOrgId, orgs } = ensureUserHasOrgOrNull(currentUser);
-      if (selectedOrgId || orgs.length > 0) {
+      const { data: settings } = await supabase
+        .from("user_settings")
+        .select("active_organization_id")
+        .eq("user_id", currentUser.id)
+        .single();
+
+      if (settings?.active_organization_id) {
         router.replace("/dashboard");
       }
     })();
@@ -43,7 +47,41 @@ export default function OnboardingPage() {
 
     setError("");
     setStatus("loading");
-    createOrg({ name }, user);
+    const { data: org, error: orgErr } = await supabase
+      .from("organizations")
+      .insert({ name, created_by: user.id })
+      .select("id")
+      .single();
+
+    if (orgErr || !org?.id) {
+      setStatus("idle");
+      setError(orgErr?.message ?? "Unable to create organization.");
+      return;
+    }
+
+    const { error: memberErr } = await supabase.from("organization_members").insert({
+      organization_id: org.id,
+      user_id: user.id,
+      role: "owner",
+    });
+
+    if (memberErr) {
+      setStatus("idle");
+      setError(memberErr.message);
+      return;
+    }
+
+    const { error: settingsErr } = await supabase.from("user_settings").upsert({
+      user_id: user.id,
+      active_organization_id: org.id,
+    });
+
+    if (settingsErr) {
+      setStatus("idle");
+      setError(settingsErr.message);
+      return;
+    }
+
     router.replace("/dashboard");
   }
 

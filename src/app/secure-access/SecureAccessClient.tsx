@@ -33,6 +33,7 @@ export default function SecureAccessClient({ orgId, orgName }: SecureAccessClien
   const [toast, setToast] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [formReveal, setFormReveal] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const rowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
@@ -98,12 +99,14 @@ export default function SecureAccessClient({ orgId, orgName }: SecureAccessClien
     setForm(emptyForm);
     setFormReveal(false);
     setToast("Vendor profile created.");
+    setShowCreateForm(false);
     router.push(`/secure-access/${vendor.id}`);
   }
 
   function handleClear() {
     setForm(emptyForm);
     setFormReveal(false);
+    setShowCreateForm(false);
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -129,117 +132,122 @@ export default function SecureAccessClient({ orgId, orgName }: SecureAccessClien
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row">
-        <section className="lg:w-1/3 lg:sticky lg:top-6 h-fit">
-          <div className="rounded-2xl border p-6 space-y-4">
-            <div>
-              <h1 className="text-xl font-semibold">Create New Vendor Profile</h1>
-              <p className="text-sm opacity-80 mt-1">
-                Add a vendor and keep secure access details scoped to {orgName}.
-              </p>
-            </div>
-
-            {toast ? (
-              <NativeMessage
-                title={toast}
-                tone={toast.toLowerCase().includes("please") ? "warning" : "success"}
-              />
-            ) : null}
-
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-wide opacity-70">Vendor Name</label>
-                <input
-                  className="w-full rounded-xl border px-3 py-2"
-                  value={form.name}
-                  onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                  placeholder="Acme Logistics"
-                  required
-                  type="text"
-                />
+        {showCreateForm ? (
+          <section className="lg:w-1/3 lg:sticky lg:top-6 h-fit">
+            <div className="rounded-2xl border p-6 space-y-4">
+              <div>
+                <h1 className="text-xl font-semibold">Create New Vendor Profile</h1>
+                <p className="text-sm opacity-80 mt-1">
+                  Add a vendor and keep secure access details scoped to {orgName}.
+                </p>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-wide opacity-70">Website</label>
-                <input
-                  className="w-full rounded-xl border px-3 py-2"
-                  value={form.website}
-                  onChange={(event) => setForm((prev) => ({ ...prev, website: event.target.value }))}
-                  placeholder="https://acme.com"
-                  required
-                  type="url"
+
+              {toast ? (
+                <NativeMessage
+                  title={toast}
+                  tone={toast.toLowerCase().includes("please") ? "warning" : "success"}
                 />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-wide opacity-70">Password</label>
-                <div className="flex gap-2">
+              ) : null}
+
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-wide opacity-70">Vendor Name</label>
                   <input
                     className="w-full rounded-xl border px-3 py-2"
-                    value={form.password}
-                    onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                    placeholder="Enter password"
+                    value={form.name}
+                    onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                    placeholder="Acme Logistics"
                     required
-                    type={formReveal ? "text" : "password"}
+                    type="text"
                   />
-                  <button
-                    className="btn btn-sm"
-                    type="button"
-                    onClick={() => setFormReveal((prev) => !prev)}
-                  >
-                    {formReveal ? "Hide" : "Reveal"}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-wide opacity-70">Website</label>
+                  <input
+                    className="w-full rounded-xl border px-3 py-2"
+                    value={form.website}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, website: event.target.value }))
+                    }
+                    placeholder="https://acme.com"
+                    required
+                    type="url"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-wide opacity-70">Password</label>
+                  <div className="flex gap-2">
+                    <input
+                      className="w-full rounded-xl border px-3 py-2"
+                      value={form.password}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, password: event.target.value }))
+                      }
+                      placeholder="Enter password"
+                      required
+                      type={formReveal ? "text" : "password"}
+                    />
+                    <button
+                      className="btn btn-sm"
+                      type="button"
+                      onClick={() => setFormReveal((prev) => !prev)}
+                    >
+                      {formReveal ? "Hide" : "Reveal"}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-wide opacity-70">Account Number</label>
+                  <input
+                    className="w-full rounded-xl border px-3 py-2"
+                    value={form.accountNumber}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, accountNumber: event.target.value }))
+                    }
+                    placeholder="AC-10290"
+                    required
+                    type="text"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-wide opacity-70">Contact Phone</label>
+                  <input
+                    className="w-full rounded-xl border px-3 py-2"
+                    value={form.contactPhone}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, contactPhone: event.target.value }))
+                    }
+                    placeholder="+1 (555) 123-0000"
+                    required
+                    type="tel"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-wide opacity-70">Contact Email</label>
+                  <input
+                    className="w-full rounded-xl border px-3 py-2"
+                    value={form.contactEmail}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, contactEmail: event.target.value }))
+                    }
+                    placeholder="admin@vendor.com"
+                    required
+                    type="email"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button className="btn btn-primary w-full" type="submit">
+                    Create Vendor
+                  </button>
+                  <button className="btn w-full" type="button" onClick={handleClear}>
+                    Clear
                   </button>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-wide opacity-70">Account Number</label>
-                <input
-                  className="w-full rounded-xl border px-3 py-2"
-                  value={form.accountNumber}
-                  onChange={(event) => setForm((prev) => ({ ...prev, accountNumber: event.target.value }))}
-                  placeholder="AC-10290"
-                  required
-                  type="text"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-wide opacity-70">Contact Phone</label>
-                <input
-                  className="w-full rounded-xl border px-3 py-2"
-                  value={form.contactPhone}
-                  onChange={(event) => setForm((prev) => ({ ...prev, contactPhone: event.target.value }))}
-                  placeholder="+1 (555) 123-0000"
-                  required
-                  type="tel"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-wide opacity-70">Contact Email</label>
-                <input
-                  className="w-full rounded-xl border px-3 py-2"
-                  value={form.contactEmail}
-                  onChange={(event) => setForm((prev) => ({ ...prev, contactEmail: event.target.value }))}
-                  placeholder="admin@vendor.com"
-                  required
-                  type="email"
-                />
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <button
-                  className="btn btn-primary w-full"
-                  type="submit"
-                >
-                  Create Vendor
-                </button>
-                <button
-                  className="btn w-full"
-                  type="button"
-                  onClick={handleClear}
-                >
-                  Clear
-                </button>
-              </div>
-            </form>
-          </div>
-        </section>
+              </form>
+            </div>
+          </section>
+        ) : null}
 
         <section className="lg:flex-1">
           <div className="rounded-2xl border p-6 space-y-4 h-full">
@@ -251,7 +259,16 @@ export default function SecureAccessClient({ orgId, orgName }: SecureAccessClien
                     Type to filter. Click a vendor to view.
                   </div>
                 </div>
-                <div className="text-xs opacity-60">{vendors.length} vendors</div>
+                <div className="flex items-center gap-3">
+                  <button
+                    className="btn btn-sm"
+                    type="button"
+                    onClick={() => setShowCreateForm(true)}
+                  >
+                    Create Vendor
+                  </button>
+                  <div className="text-xs opacity-60">{vendors.length} vendors</div>
+                </div>
               </div>
               <div className="mt-4">
                 <input

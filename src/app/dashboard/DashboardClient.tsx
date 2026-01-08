@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { loadPayrollState, PayrollChangeLog } from "@/lib/payroll/store";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { NativeMessage } from "@/components/ui/NativeMessage";
 
 const timeAgo = (iso: string) => {
   const delta = Date.now() - new Date(iso).getTime();
@@ -36,6 +37,8 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
   const [messages, setMessages] = useState<{ id: string; text: string; createdAt: string }[]>(
     []
   );
+  const [showMessageForm, setShowMessageForm] = useState(false);
+  const [messageDraft, setMessageDraft] = useState("");
 
   useEffect(() => {
     const payrollState = loadPayrollState();
@@ -178,9 +181,7 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
     reader.readAsDataURL(file);
   }
 
-  function addMessage() {
-    const text = window.prompt("Add a message for your org:");
-    if (!text) return;
+  function addMessage(text: string) {
     const trimmed = text.trim();
     if (!trimmed) return;
     const next = [
@@ -199,9 +200,15 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
     <main className="min-h-screen p-6 flex flex-col">
       <div className="space-y-6">
         <header className="relative flex flex-col gap-4 sm:min-h-[132px]">
-          <div className="text-center">
+          <div className="text-center space-y-0">
             <div className="text-2xl font-semibold">{headerTitle}</div>
-            <div className="text-sm opacity-70 mt-1">Scoped to {orgName}</div>
+            <div className="mt-0 flex flex-col items-center justify-center gap-4 sm:flex-row">
+              <div className="text-center">
+                <div className="font-semibold">My Access</div>
+                <div className="text-xs opacity-80 mt-1">Role: Admin (mock)</div>
+              </div>
+            </div>
+            <div className="text-sm opacity-80 mt-1">My Profile: {email}</div>
           </div>
           <div className="rounded-2xl border p-4 text-center space-y-3 sm:w-64 sm:absolute sm:right-0 sm:top-0">
             <div className="font-semibold">Organization Logo</div>
@@ -226,43 +233,75 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
           </div>
         </header>
 
-        <section className="rounded-2xl border p-4 text-center space-y-3">
-          <div className="flex flex-col items-center justify-between gap-2 sm:flex-row">
+        <section className="mx-auto w-full max-w-2xl border border-black p-4 text-center space-y-3 bg-[#D6AF7C] shadow-[0_10px_30px_rgba(14,30,74,0.08)]">
+          <div className="flex flex-col items-center gap-2">
             <div className="font-semibold">Message Board</div>
-            <button className="btn btn-sm" type="button" onClick={addMessage}>
+            <button
+              className="btn btn-sm border-emerald-200 bg-emerald-50 text-emerald-700"
+              type="button"
+              onClick={() => setShowMessageForm(true)}
+            >
               Add message
             </button>
           </div>
           <div className="text-sm opacity-80">
             Welcome back, {email}. Share quick updates with your org.
           </div>
+          {showMessageForm ? (
+            <NativeMessage
+              title="New announcement"
+              body="Write a short update for your team."
+              actions={
+                <div className="flex w-full flex-col gap-2">
+                  <textarea
+                    className="w-full border bg-white px-3 py-2 text-sm"
+                    rows={3}
+                    value={messageDraft}
+                    onChange={(event) => setMessageDraft(event.target.value)}
+                    placeholder="Add a message for your org..."
+                  />
+                  <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+                    <button
+                      className="btn btn-sm border-emerald-200 bg-emerald-50 text-emerald-700"
+                      type="button"
+                      onClick={() => {
+                        addMessage(messageDraft);
+                        setMessageDraft("");
+                        setShowMessageForm(false);
+                      }}
+                    >
+                      Post message
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      type="button"
+                      onClick={() => {
+                        setMessageDraft("");
+                        setShowMessageForm(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              }
+            />
+          ) : null}
           {messages.length === 0 ? (
             <EmptyState title="No messages yet" body="Add the first update for your org." />
           ) : (
             <ul className="space-y-2 text-center">
               {messages.map((message) => (
-                <li key={message.id} className="rounded-2xl border px-4 py-3 text-sm text-center">
+                <li
+                  key={message.id}
+                  className="border bg-white px-4 py-3 text-sm text-center shadow-[0_6px_16px_rgba(14,30,74,0.08)]"
+                >
                   <div className="font-medium">{message.text}</div>
                   <div className="text-xs opacity-60 mt-1">{timeAgo(message.createdAt)}</div>
                 </li>
               ))}
             </ul>
           )}
-        </section>
-
-        <section className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border p-2 text-center">
-            <div className="font-semibold">My Access</div>
-            <div className="text-xs opacity-80 mt-1">Role: Admin (mock)</div>
-          </div>
-          <div className="rounded-2xl border p-2 text-center">
-            <div className="font-semibold">My Profile</div>
-            <div className="text-xs opacity-80 mt-1">Organization: ORGanizer (mock)</div>
-          </div>
-          <div className="rounded-2xl border p-2 text-center">
-            <div className="font-semibold">Recent</div>
-            <div className="text-xs opacity-80 mt-1">No recent activity (mock)</div>
-          </div>
         </section>
 
         <button
@@ -276,21 +315,23 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
           <div className="text-xs opacity-60 mt-2">Scoped to {orgName}</div>
         </button>
 
-        <button
-          className="mx-auto w-full md:w-1/2 rounded-2xl border p-6 text-center hover:bg-black/5"
-          onClick={() => router.push("/secure-access")}
-        >
-          <div className="text-lg font-semibold">Secure Access Notes</div>
-          <div className="text-sm opacity-80 mt-2">
-            Vendor profiles, access details, and handoff notes.
-          </div>
-          <div className="text-xs opacity-60 mt-2">Scoped to {orgName}</div>
-        </button>
+        <div className="flex justify-center">
+          <button
+            className="w-full md:w-1/2 rounded-2xl border p-6 text-center hover:bg-black/5"
+            onClick={() => router.push("/secure-access")}
+          >
+            <div className="text-lg font-semibold">Secure Access Notes</div>
+            <div className="text-sm opacity-80 mt-2">
+              Vendor profiles, access details, and handoff notes.
+            </div>
+            <div className="text-xs opacity-60 mt-2">Scoped to {orgName}</div>
+          </button>
+        </div>
 
         <section className="rounded-2xl border p-6 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-            <div className="text-lg font-semibold">Upcoming Payroll Changes</div>
+              <div className="text-lg font-semibold">Upcoming Payroll Changes</div>
               <div className="text-sm opacity-80">Recent changes for {orgName}.</div>
             </div>
             <button
@@ -336,34 +377,36 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
           {payrollLogs.length === 0 ? (
             <EmptyState title="No payroll changes yet" body="Recent updates will appear here." />
           ) : (
-            <ul className="space-y-2 text-sm">
-              {payrollLogs.map((log) => {
-                const fieldsSummary = log.fieldsChanged.length
-                  ? log.fieldsChanged.join(", ")
-                  : log.summary;
-                const hasNoteChange = log.fieldsChanged.includes("Notes");
-                return (
-                  <li key={log.id} className="rounded-2xl border px-4 py-3">
-                    <div className="font-medium">{log.employeeName}</div>
-                    <div className="text-xs opacity-70">
-                      {fieldsSummary} · by {log.actorName} · {timeAgo(log.createdAt)}
-                    </div>
-                    {hasNoteChange ? (
-                      <div className="mt-2 text-xs opacity-70 space-y-1">
-                        <div>
-                          <span className="font-semibold">Previous note:</span>{" "}
-                          {log.noteBefore?.trim() ? log.noteBefore : "—"}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Updated note:</span>{" "}
-                          {log.noteAfter?.trim() ? log.noteAfter : "—"}
-                        </div>
+            <div className="max-h-[360px] overflow-y-auto pr-1">
+              <ul className="space-y-2 text-sm">
+                {payrollLogs.map((log) => {
+                  const fieldsSummary = log.fieldsChanged.length
+                    ? log.fieldsChanged.join(", ")
+                    : log.summary;
+                  const hasNoteChange = log.fieldsChanged.includes("Notes");
+                  return (
+                    <li key={log.id} className="rounded-2xl border px-4 py-3">
+                      <div className="font-medium">{log.employeeName}</div>
+                      <div className="text-xs opacity-70">
+                        {fieldsSummary} · by {log.actorName} · {timeAgo(log.createdAt)}
                       </div>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
+                      {hasNoteChange ? (
+                        <div className="mt-2 text-xs opacity-70 space-y-1">
+                          <div>
+                            <span className="font-semibold">Previous note:</span>{" "}
+                            {log.noteBefore?.trim() ? log.noteBefore : "—"}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Updated note:</span>{" "}
+                            {log.noteAfter?.trim() ? log.noteAfter : "—"}
+                          </div>
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           )}
         </section>
       </div>
