@@ -385,7 +385,7 @@ export default function SecureAccessVendorClient() {
                     body={`Delete ${vendor.name} from the database?`}
                     tone="warning"
                     actions={
-                      <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+                    <div className="flex w-full flex-col items-center gap-2 sm:flex-row sm:justify-center">
                         <button
                           className="btn btn-sm border-red-200 bg-red-50 text-red-700"
                           type="button"
