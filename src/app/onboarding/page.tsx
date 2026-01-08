@@ -47,38 +47,15 @@ export default function OnboardingPage() {
 
     setError("");
     setStatus("loading");
-    const { data: org, error: orgErr } = await supabase
-      .from("organizations")
-      .insert({ name, created_by: user.id })
-      .select("id")
-      .single();
-
-    if (orgErr || !org?.id) {
-      setStatus("idle");
-      setError(orgErr?.message ?? "Unable to create organization.");
-      return;
-    }
-
-    const { error: memberErr } = await supabase.from("organization_members").insert({
-      organization_id: org.id,
-      user_id: user.id,
-      role: "owner",
+    const response = await fetch("/api/orgs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
     });
 
-    if (memberErr) {
+    if (!response.ok) {
       setStatus("idle");
-      setError(memberErr.message);
-      return;
-    }
-
-    const { error: settingsErr } = await supabase.from("user_settings").upsert({
-      user_id: user.id,
-      active_organization_id: org.id,
-    });
-
-    if (settingsErr) {
-      setStatus("idle");
-      setError(settingsErr.message);
+      setError("We couldn’t create your organization. Please try again.");
       return;
     }
 
