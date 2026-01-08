@@ -10,12 +10,13 @@ export async function setCurrentOrg(_: unknown, formData: FormData) {
     return { error: "Select an organization." };
   }
 
+  const cookieStore = cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => cookies().getAll(),
+        getAll: () => cookieStore.getAll(),
         setAll: () => {},
       },
     }
@@ -52,6 +53,6 @@ export async function setCurrentOrg(_: unknown, formData: FormData) {
     return { error: "You don’t have access to that organization." };
   }
 
-  cookies().set("org_id", orgId, { path: "/", sameSite: "lax" });
+  cookieStore.set("org_id", orgId, { path: "/", sameSite: "lax" });
   redirect("/dashboard");
 }
