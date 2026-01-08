@@ -4,19 +4,24 @@ import { createServerClient } from "@supabase/ssr";
 
 type OrgMembership = { org_id: string; role: string };
 
-const createSupabaseServer = () =>
-  createServerClient(
+const createSupabaseServer = async () => {
+  const cookieStore = await cookies();
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => cookies().getAll(),
+        getAll: () => cookieStore.getAll(),
         setAll: () => {},
       },
     }
   );
+};
 
-const normalizeMemberships = async (supabase: ReturnType<typeof createSupabaseServer>, userId: string) => {
+const normalizeMemberships = async (
+  supabase: Awaited<ReturnType<typeof createSupabaseServer>>,
+  userId: string
+) => {
   const { data: memberships } = await supabase
     .from("org_members")
     .select("org_id, role")
@@ -43,7 +48,7 @@ export async function getCurrentOrgId() {
   const cookieStore = await cookies();
   const orgCookie = cookieStore.get("org_id")?.value;
 
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -62,7 +67,7 @@ export async function getCurrentOrgId() {
 }
 
 export async function getOrgRole(orgId: string) {
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -89,7 +94,7 @@ export async function getOrgRole(orgId: string) {
 }
 
 export async function requireOrgMember(orgId: string) {
-  const supabase = createSupabaseServer();
+  const supabase = await createSupabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();

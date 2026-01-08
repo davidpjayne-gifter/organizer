@@ -19,12 +19,13 @@ export async function acceptInvite(_: { error?: string }, formData: FormData) {
     return { error: "Invalid invite link." };
   }
 
+  const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => cookies().getAll(),
+        getAll: () => cookieStore.getAll(),
         setAll: () => {},
       },
     }
@@ -47,7 +48,7 @@ export async function acceptInvite(_: { error?: string }, formData: FormData) {
   }
 
   const orgId = data.org_id as string;
-  cookies().set("org_id", orgId, { path: "/", sameSite: "lax" });
+  cookieStore.set("org_id", orgId, { path: "/", sameSite: "lax" });
 
   await supabase.from("user_settings").upsert({
     user_id: user.id,

@@ -15,10 +15,10 @@ const isValidRole = (role: string) => role === "member" || role === "admin";
 
 const isValidEmail = (email: string) => /\S+@\S+\.\S+/.test(email);
 
-const getBaseUrl = () => {
+const getBaseUrl = async () => {
   const fromEnv = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
   if (fromEnv) return fromEnv.replace(/\/+$/, "");
-  const headerList = headers();
+  const headerList = await headers();
   const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
   const proto = headerList.get("x-forwarded-proto") ?? "https";
   return host ? `${proto}://${host}` : "";
@@ -46,12 +46,13 @@ export async function createInvite(_: InviteState, formData: FormData): Promise<
     return { error: "You don’t have permission to invite members." };
   }
 
+  const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => cookies().getAll(),
+        getAll: () => cookieStore.getAll(),
         setAll: () => {},
       },
     }
@@ -73,7 +74,7 @@ export async function createInvite(_: InviteState, formData: FormData): Promise<
     return { error: "Unable to create invite link." };
   }
 
-  const baseUrl = getBaseUrl();
+  const baseUrl = await getBaseUrl();
   if (!baseUrl) {
     return { error: "Missing app URL configuration." };
   }
@@ -106,12 +107,13 @@ export async function transferOwnership(
     return { error: "Only the current owner can transfer ownership." };
   }
 
+  const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => cookies().getAll(),
+        getAll: () => cookieStore.getAll(),
         setAll: () => {},
       },
     }

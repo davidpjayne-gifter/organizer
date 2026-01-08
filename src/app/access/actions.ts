@@ -4,13 +4,13 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 
-export async function setCurrentOrg(_: unknown, formData: FormData) {
+export async function setCurrentOrg(formData: FormData): Promise<void> {
   const orgId = String(formData.get("org_id") ?? "").trim();
   if (!orgId) {
-    return { error: "Select an organization." };
+    return;
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -50,7 +50,7 @@ export async function setCurrentOrg(_: unknown, formData: FormData) {
   }
 
   if (!isMember) {
-    return { error: "You don’t have access to that organization." };
+    return;
   }
 
   cookieStore.set("org_id", orgId, { path: "/", sameSite: "lax" });
