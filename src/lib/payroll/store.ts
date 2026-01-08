@@ -37,7 +37,7 @@ interface PayrollState {
   payrollChangeLogByOrgId: Record<string, PayrollChangeLog[]>;
 }
 
-const STORAGE_KEY = "organizer_payroll_v1";
+const STORAGE_KEY = "organizer_payroll_v2";
 
 const createId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -52,12 +52,7 @@ const emptyState = (): PayrollState => ({
   payrollChangeLogByOrgId: {},
 });
 
-const seedEmployees = (): Employee[] => [
-  { id: createId(), name: "Ava Morales", role: "HR Manager", department: "People" },
-  { id: createId(), name: "Ethan Park", role: "Staff Engineer", department: "Product" },
-  { id: createId(), name: "Maya Singh", role: "Operations Lead", department: "Operations" },
-  { id: createId(), name: "Jordan Blake", role: "Finance Analyst", department: "Finance" },
-];
+const seedEmployees = (): Employee[] => [];
 
 const defaultProfileFor = (employee: Employee): PayrollProfile => {
   if (employee.role.toLowerCase().includes("engineer")) {

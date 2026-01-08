@@ -205,7 +205,7 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
             <div className="mt-0 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <div className="text-center">
                 <div className="font-semibold">My Access</div>
-                <div className="text-xs opacity-80 mt-1">Role: Admin (mock)</div>
+                <div className="text-xs opacity-80 mt-1">Role: Admin</div>
               </div>
             </div>
             <div className="text-sm opacity-80 mt-1">My Profile: {email}</div>
@@ -312,7 +312,6 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
           <div className="text-sm opacity-80 mt-2">
             Review employee payroll profiles and track changes.
           </div>
-          <div className="text-xs opacity-60 mt-2">Scoped to {orgName}</div>
         </button>
 
         <div className="flex justify-center">
@@ -324,7 +323,6 @@ export default function DashboardClient({ orgId, orgName, email }: DashboardClie
             <div className="text-sm opacity-80 mt-2">
               Vendor profiles, access details, and handoff notes.
             </div>
-            <div className="text-xs opacity-60 mt-2">Scoped to {orgName}</div>
           </button>
         </div>
 
