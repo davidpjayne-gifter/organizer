@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/browser";
-import { loadPayrollState, PayrollChangeLog } from "@/lib/payroll/store";
+import { PayrollChangeLog } from "@/lib/payroll/store";
+import { fetchPayrollLogs, fetchPayrollLogsSince } from "@/lib/payroll/supabase";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { NativeMessage } from "@/components/ui/NativeMessage";
 import { InviteFormClient } from "@/app/settings/members/InviteFormClient";
@@ -60,10 +61,21 @@ export default function DashboardClient({
   const logoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    const payrollState = loadPayrollState();
-    const logs = payrollState.payrollChangeLogByOrgId[orgId] ?? [];
-    setPayrollLogs(logs.slice(0, 10));
-  }, [orgId]);
+    let isMounted = true;
+    async function loadLogs() {
+      const logs = await fetchPayrollLogs(supabase, orgId, 10);
+      if (!isMounted) return;
+      setPayrollLogs(logs);
+    }
+    if (orgId) {
+      loadLogs().catch((error) => {
+        console.error(error);
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [orgId, supabase]);
 
   useEffect(() => {
     if (!orgId) return;
@@ -90,11 +102,11 @@ export default function DashboardClient({
     return `ORGanizer: ${orgName}`;
   }, [orgName]);
 
-  function exportPayrollChanges(days: number) {
+  async function exportPayrollChanges(days: number) {
     setExportNotice("");
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-    const allLogs = loadPayrollState().payrollChangeLogByOrgId[orgId] ?? [];
-    const filtered = allLogs.filter((log) => new Date(log.createdAt).getTime() >= cutoff);
+    const sinceIso = new Date(cutoff).toISOString();
+    const filtered = await fetchPayrollLogsSince(supabase, orgId, sinceIso);
     if (filtered.length === 0) {
       setExportNotice("No changes in the selected range.");
       return;
@@ -413,7 +425,7 @@ export default function DashboardClient({
             </div>
             <button
               className="btn btn-sm"
-              onClick={() => exportPayrollChanges(Number(exportRange))}
+              onClick={() => void exportPayrollChanges(Number(exportRange))}
             >
               Export
             </button>

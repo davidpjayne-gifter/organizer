@@ -4,14 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
-  deleteVendor,
   getWebsiteDomain,
-  loadState,
-  logVendorEvent,
-  updateVendor,
   Vendor,
   VendorActivityEvent,
 } from "@/lib/secure-access/store";
+import { supabaseBrowser } from "@/lib/supabase/browser";
+import {
+  deleteVendor,
+  fetchVendorActivity,
+  fetchVendorById,
+  logVendorEvent,
+  updateVendor,
+} from "@/lib/secure-access/supabase";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { NativeMessage } from "@/components/ui/NativeMessage";
 
@@ -29,10 +33,19 @@ const timeAgo = (iso: string) => {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 };
 
-export default function SecureAccessVendorClient() {
+interface SecureAccessVendorClientProps {
+  orgId: string;
+  actorName: string;
+}
+
+export default function SecureAccessVendorClient({
+  orgId,
+  actorName,
+}: SecureAccessVendorClientProps) {
   const params = useParams();
   const vendorId = params.vendorId as string;
   const router = useRouter();
+  const supabase = useMemo(() => supabaseBrowser(), []);
 
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [activity, setActivity] = useState<VendorActivityEvent[]>([]);
@@ -52,26 +65,41 @@ export default function SecureAccessVendorClient() {
   });
 
   useEffect(() => {
-    const state = loadState();
-    const found = state.vendors.find((item) => item.id === vendorId) ?? null;
-    if (!found) {
-      setNotFound(true);
-      setVendor(null);
-      return;
+    let isMounted = true;
+    async function load() {
+      const found = await fetchVendorById(supabase, orgId, vendorId);
+      if (!isMounted) return;
+      if (!found) {
+        setNotFound(true);
+        setVendor(null);
+        return;
+      }
+
+      setNotFound(false);
+      setVendor(found);
+      setForm({
+        name: found.name,
+        website: found.website,
+        accountNumber: found.accountNumber,
+        contactPhone: found.contactPhone,
+        contactEmail: found.contactEmail,
+        password: found.password,
+      });
+      const nextActivity = await fetchVendorActivity(supabase, orgId, vendorId);
+      if (!isMounted) return;
+      setActivity(nextActivity);
     }
 
-    setNotFound(false);
-    setVendor(found);
-    setForm({
-      name: found.name,
-      website: found.website,
-      accountNumber: found.accountNumber,
-      contactPhone: found.contactPhone,
-      contactEmail: found.contactEmail,
-      password: found.password,
+    load().catch((error) => {
+      console.error(error);
+      setNotFound(true);
+      setVendor(null);
     });
-    setActivity(state.activityByVendorId[vendorId] ?? []);
-  }, [vendorId]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [orgId, supabase, vendorId]);
 
   useEffect(() => {
     if (!copyStatus) return;
@@ -108,22 +136,22 @@ export default function SecureAccessVendorClient() {
     );
   }
 
-  function refresh() {
-    const state = loadState();
-    const updated = state.vendors.find((item) => item.id === vendorId) ?? null;
+  async function refresh() {
+    const updated = await fetchVendorById(supabase, orgId, vendorId);
     setVendor(updated);
-    setActivity(state.activityByVendorId[vendorId] ?? []);
+    const nextActivity = await fetchVendorActivity(supabase, orgId, vendorId);
+    setActivity(nextActivity);
   }
 
   function handleToggleReveal() {
     const next = !showPassword;
     setShowPassword(next);
     if (next) {
-      logVendorEvent(vendorId, {
+      logVendorEvent(supabase, orgId, vendorId, {
         action: "Password revealed",
-        actorName: "Admin",
+        actorName,
       });
-      refresh();
+      void refresh();
     }
   }
 
@@ -132,17 +160,17 @@ export default function SecureAccessVendorClient() {
     try {
       await navigator.clipboard.writeText(vendor.password);
       setCopyStatus("Copied");
-      logVendorEvent(vendorId, {
+      logVendorEvent(supabase, orgId, vendorId, {
         action: "Password copied",
-        actorName: "Admin",
+        actorName,
       });
-      refresh();
+      void refresh();
     } catch {
       setCopyStatus("Copy failed");
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!vendor) return;
     const changes: string[] = [];
     const patch: Partial<Vendor> = {};
@@ -177,14 +205,13 @@ export default function SecureAccessVendorClient() {
       return;
     }
 
-    updateVendor(vendorId, patch, "Admin");
-    logVendorEvent(vendorId, {
-      action: "Vendor updated",
-      actorName: "Admin",
-      fieldsChanged: changes,
-    });
-    refresh();
-    setEditing(false);
+    try {
+      await updateVendor(supabase, orgId, vendorId, patch, actorName, changes);
+      await refresh();
+      setEditing(false);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   function handleCancel() {
@@ -200,14 +227,19 @@ export default function SecureAccessVendorClient() {
     });
   }
 
-  function handleDeleteVendor() {
+  async function handleDeleteVendor() {
     if (!vendor) return;
-    deleteVendor(vendorId);
-    logVendorEvent(vendorId, {
-      action: "Vendor deleted",
-      actorName: "Admin",
-    });
-    router.push("/secure-access");
+    try {
+      await logVendorEvent(supabase, orgId, vendorId, {
+        action: "Vendor deleted",
+        actorName,
+      });
+      await deleteVendor(supabase, orgId, vendorId);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      router.push("/secure-access");
+    }
   }
 
   return (

@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  createVendor,
   getWebsiteDomain,
-  loadState,
-  logVendorEvent,
   Vendor,
+  VendorActivityEvent,
 } from "@/lib/secure-access/store";
+import { supabaseBrowser } from "@/lib/supabase/browser";
+import { createVendor, fetchVendors } from "@/lib/secure-access/supabase";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { NativeMessage } from "@/components/ui/NativeMessage";
 
@@ -24,24 +24,72 @@ const emptyForm = {
 interface SecureAccessClientProps {
   orgId: string;
   orgName: string;
+  actorName: string;
 }
 
-export default function SecureAccessClient({ orgId, orgName }: SecureAccessClientProps) {
+const LOCAL_STORAGE_KEY = "organizer_secure_access_v1";
+
+const readLocalSecureAccessState = () => {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as {
+      vendors: Vendor[];
+      activityByVendorId: Record<string, VendorActivityEvent[]>;
+    };
+  } catch {
+    return null;
+  }
+};
+
+export default function SecureAccessClient({
+  orgId,
+  orgName,
+  actorName,
+}: SecureAccessClientProps) {
   const router = useRouter();
+  const supabase = useMemo(() => supabaseBrowser(), []);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [formReveal, setFormReveal] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [migrationReady, setMigrationReady] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState<"idle" | "running" | "done" | "error">(
+    "idle"
+  );
 
   const rowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   useEffect(() => {
-    const state = loadState();
-    setVendors(state.vendors);
-    setShowCreateForm(state.vendors.length === 0);
-  }, []);
+    let isMounted = true;
+    async function load() {
+      const fetched = await fetchVendors(supabase, orgId);
+      if (!isMounted) return;
+      setVendors(fetched);
+      setShowCreateForm(fetched.length === 0);
+
+      const localState = readLocalSecureAccessState();
+      const localVendors = localState?.vendors ?? [];
+      const migratedFlag = window.localStorage.getItem(`organizer_secure_access_migrated_${orgId}`);
+      if (!migratedFlag && fetched.length === 0 && localVendors.length > 0) {
+        setMigrationReady(true);
+      } else {
+        setMigrationReady(false);
+      }
+    }
+
+    load().catch((error) => {
+      console.error(error);
+      setToast("Unable to load vendors.");
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [orgId, supabase]);
 
   useEffect(() => {
     if (!toast) return;
@@ -71,7 +119,7 @@ export default function SecureAccessClient({ orgId, orgName }: SecureAccessClien
     }
   }, [bestMatchId, filteredVendors.length]);
 
-  function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     const trimmed = {
       name: form.name.trim(),
@@ -88,26 +136,90 @@ export default function SecureAccessClient({ orgId, orgName }: SecureAccessClien
       return;
     }
 
-    const vendor = createVendor(trimmed);
-    logVendorEvent(vendor.id, {
-      action: "Vendor created",
-      actorName: "Admin",
-    });
+    try {
+      const vendor = await createVendor(supabase, orgId, trimmed, actorName);
 
-    const state = loadState();
-    setVendors(state.vendors);
-    setSearch("");
-    setForm(emptyForm);
-    setFormReveal(false);
-    setToast("Vendor profile created.");
-    setShowCreateForm(false);
-    router.push(`/secure-access/${vendor.id}`);
+      const refreshed = await fetchVendors(supabase, orgId);
+      setVendors(refreshed);
+      setSearch("");
+      setForm(emptyForm);
+      setFormReveal(false);
+      setToast("Vendor profile created.");
+      setShowCreateForm(false);
+      router.push(`/secure-access/${vendor.id}`);
+    } catch (error) {
+      console.error(error);
+      setToast("Unable to create vendor profile.");
+    }
   }
 
   function handleClear() {
     setForm(emptyForm);
     setFormReveal(false);
     setShowCreateForm(false);
+  }
+
+  async function handleMigrateLocal() {
+    setMigrationStatus("running");
+    try {
+      const localState = readLocalSecureAccessState();
+      const localVendors = localState?.vendors ?? [];
+      if (localVendors.length === 0) {
+        setMigrationReady(false);
+        setMigrationStatus("done");
+        return;
+      }
+
+      const vendorRows = localVendors.map((vendor) => ({
+        id: vendor.id,
+        org_id: orgId,
+        name: vendor.name,
+        website: vendor.website,
+        password: vendor.password,
+        account_number: vendor.accountNumber,
+        contact_phone: vendor.contactPhone,
+        contact_email: vendor.contactEmail,
+        last_updated_at: vendor.lastUpdatedAt,
+        last_updated_by: vendor.lastUpdatedBy,
+      }));
+
+      const { error: vendorError } = await supabase
+        .from("secure_access_vendors")
+        .upsert(vendorRows, { onConflict: "id" });
+
+      if (vendorError) throw vendorError;
+
+      const activityRows = Object.entries(localState?.activityByVendorId ?? {}).flatMap(
+        ([vendorId, events]) =>
+          (events ?? []).map((event) => ({
+            org_id: orgId,
+            vendor_id: vendorId,
+            action: event.action,
+            actor_name: event.actorName,
+            created_at: event.createdAt,
+            fields_changed: event.fieldsChanged ?? [],
+            note: event.note ?? null,
+          }))
+      );
+
+      if (activityRows.length > 0) {
+        const { error: activityError } = await supabase
+          .from("secure_access_activity")
+          .insert(activityRows);
+        if (activityError) throw activityError;
+      }
+
+      window.localStorage.setItem(`organizer_secure_access_migrated_${orgId}`, "true");
+      const refreshed = await fetchVendors(supabase, orgId);
+      setVendors(refreshed);
+      setMigrationReady(false);
+      setMigrationStatus("done");
+      setToast("Local vendor data backed up to Supabase.");
+    } catch (error) {
+      console.error(error);
+      setMigrationStatus("error");
+      setToast("Unable to back up local vendor data.");
+    }
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -271,6 +383,24 @@ export default function SecureAccessClient({ orgId, orgName }: SecureAccessClien
                   <div className="text-xs opacity-60">{vendors.length} vendors</div>
                 </div>
               </div>
+              {migrationReady ? (
+                <div className="mt-4">
+                  <NativeMessage
+                    title="Local vendor data found"
+                    body="Back it up to Supabase so it’s available across devices."
+                    actions={
+                      <button
+                        className="btn btn-sm"
+                        type="button"
+                        onClick={handleMigrateLocal}
+                        disabled={migrationStatus === "running"}
+                      >
+                        {migrationStatus === "running" ? "Backing up…" : "Back up local data"}
+                      </button>
+                    }
+                  />
+                </div>
+              ) : null}
               <div className="mt-4">
                 <input
                   className="w-full rounded-xl border px-3 py-2"

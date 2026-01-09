@@ -2,7 +2,7 @@ import { requireUserAndActiveOrg } from "@/lib/server/requireOrg";
 import SecureAccessClient from "./SecureAccessClient";
 
 export default async function SecureAccessPage() {
-  const { supabase, activeOrgId } = await requireUserAndActiveOrg();
+  const { supabase, activeOrgId, user } = await requireUserAndActiveOrg();
 
   const { data: org } = await supabase
     .from("organizations")
@@ -12,5 +12,11 @@ export default async function SecureAccessPage() {
 
   const orgName = org?.name ?? "";
 
-  return <SecureAccessClient orgId={activeOrgId} orgName={orgName} />;
+  return (
+    <SecureAccessClient
+      orgId={activeOrgId}
+      orgName={orgName}
+      actorName={user.email ?? "Admin"}
+    />
+  );
 }

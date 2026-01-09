@@ -4,13 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Employee,
+  PayrollProfile,
+  loadPayrollState,
+} from "@/lib/payroll/store";
+import { supabaseBrowser } from "@/lib/supabase/browser";
+import {
   createEmployeeProfile,
   deleteEmployeeProfile,
-  getEmployees,
-  getPayrollProfile,
-  PayrollProfile,
+  fetchEmployees,
+  fetchPayrollProfile,
+  getBlankPayrollProfile,
   updatePayrollProfile,
-} from "@/lib/payroll/store";
+} from "@/lib/payroll/supabase";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { NativeMessage } from "@/components/ui/NativeMessage";
 
@@ -77,6 +82,7 @@ interface PayrollClientProps {
 
 export default function PayrollClient({ orgId, orgName, actorName }: PayrollClientProps) {
   const router = useRouter();
+  const supabase = useMemo(() => supabaseBrowser(), []);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [search, setSearch] = useState("");
@@ -88,25 +94,54 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
     department: "",
   });
   const [saveNotice, setSaveNotice] = useState("");
+  const [errorNotice, setErrorNotice] = useState("");
+  const [migrationReady, setMigrationReady] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState<"idle" | "running" | "done" | "error">(
+    "idle"
+  );
   const [deleteCandidate, setDeleteCandidate] = useState<Employee | null>(null);
 
   useEffect(() => {
-    const loadedEmployees = getEmployees(orgId);
-    const initialEmployeeId = loadedEmployees[0]?.id ?? "";
-    if (initialEmployeeId) {
-      const profile = getPayrollProfile(orgId, initialEmployeeId);
-      setForm(profileToForm(profile));
-      setIsCreatingNew(false);
-    } else {
-      setIsCreatingNew(true);
-      setNewEmployee({ name: "", role: "", department: "" });
-      const blankProfile = getPayrollProfile(orgId, "__new__");
-      setForm(profileToForm(blankProfile));
+    let isMounted = true;
+    async function load() {
+      setErrorNotice("");
+      const loadedEmployees = await fetchEmployees(supabase, orgId);
+      if (!isMounted) return;
+      const initialEmployeeId = loadedEmployees[0]?.id ?? "";
+      if (initialEmployeeId) {
+        const profile = await fetchPayrollProfile(supabase, orgId, initialEmployeeId);
+        if (!isMounted) return;
+        setForm(profileToForm(profile));
+        setIsCreatingNew(false);
+      } else {
+        setIsCreatingNew(true);
+        setNewEmployee({ name: "", role: "", department: "" });
+        const blankProfile = getBlankPayrollProfile();
+        setForm(profileToForm(blankProfile));
+      }
+
+      setEmployees(loadedEmployees);
+      setSelectedEmployeeId(initialEmployeeId);
+
+      const localState = loadPayrollState();
+      const localEmployees = localState.employeesByOrgId?.[orgId] ?? [];
+      const migratedFlag = window.localStorage.getItem(`organizer_payroll_migrated_${orgId}`);
+      if (!migratedFlag && loadedEmployees.length === 0 && localEmployees.length > 0) {
+        setMigrationReady(true);
+      } else {
+        setMigrationReady(false);
+      }
     }
 
-    setEmployees(loadedEmployees);
-    setSelectedEmployeeId(initialEmployeeId);
-  }, [orgId]);
+    load().catch((error) => {
+      console.error(error);
+      setErrorNotice("Unable to load payroll data.");
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [orgId, supabase]);
 
   const filteredEmployees = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -124,9 +159,20 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
 
   useEffect(() => {
     if (!selectedEmployee || isCreatingNew) return;
-    const profile = getPayrollProfile(orgId, selectedEmployee.id);
-    setForm(profileToForm(profile));
-  }, [orgId, selectedEmployee]);
+    let isMounted = true;
+    async function loadProfile() {
+      const profile = await fetchPayrollProfile(supabase, orgId, selectedEmployee.id);
+      if (!isMounted) return;
+      setForm(profileToForm(profile));
+    }
+    loadProfile().catch((error) => {
+      console.error(error);
+      setErrorNotice("Unable to load payroll details.");
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [orgId, selectedEmployee, isCreatingNew, supabase]);
 
   useEffect(() => {
     if (!form || !isCreatingNew) return;
@@ -201,18 +247,27 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
       const fallbackId = employees[0]?.id ?? "";
       if (fallbackId) {
         setSelectedEmployeeId(fallbackId);
-        const profile = getPayrollProfile(orgId, fallbackId);
-        setForm(profileToForm(profile));
+        fetchPayrollProfile(supabase, orgId, fallbackId)
+          .then((profile) => setForm(profileToForm(profile)))
+          .catch((error) => {
+            console.error(error);
+            setErrorNotice("Unable to load payroll details.");
+          });
       }
       return;
     }
     if (!selectedEmployee) return;
-    const profile = getPayrollProfile(orgId, selectedEmployee.id);
-    setForm(profileToForm(profile));
+    fetchPayrollProfile(supabase, orgId, selectedEmployee.id)
+      .then((profile) => setForm(profileToForm(profile)))
+      .catch((error) => {
+        console.error(error);
+        setErrorNotice("Unable to load payroll details.");
+      });
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!form) return;
+    setErrorNotice("");
     if (isCreatingNew) {
       const trimmed = {
         name: newEmployee.name.trim(),
@@ -223,25 +278,48 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
         return;
       }
       const nextProfile = formToProfile(form);
-      const created = createEmployeeProfile(orgId, trimmed, nextProfile, actorName);
-      const refreshedEmployees = getEmployees(orgId);
-      setEmployees(refreshedEmployees);
-      setSelectedEmployeeId(created.id);
-      setIsCreatingNew(false);
-      setNewEmployee({ name: "", role: "", department: "" });
-      const refreshed = getPayrollProfile(orgId, created.id);
-      setForm(profileToForm(refreshed));
-      setSaveNotice("Profile created and saved.");
+      try {
+        const created = await createEmployeeProfile(
+          supabase,
+          orgId,
+          trimmed,
+          nextProfile,
+          actorName
+        );
+        const refreshedEmployees = await fetchEmployees(supabase, orgId);
+        setEmployees(refreshedEmployees);
+        setSelectedEmployeeId(created.id);
+        setIsCreatingNew(false);
+        setNewEmployee({ name: "", role: "", department: "" });
+        const refreshed = await fetchPayrollProfile(supabase, orgId, created.id);
+        setForm(profileToForm(refreshed));
+        setSaveNotice("Profile created and saved.");
+      } catch (error) {
+        console.error(error);
+        setErrorNotice("Unable to save the profile.");
+      }
       return;
     }
     if (!selectedEmployee) return;
-    const prevProfile = getPayrollProfile(orgId, selectedEmployee.id);
-    const nextProfile = formToProfile(form);
+    try {
+      const prevProfile = await fetchPayrollProfile(supabase, orgId, selectedEmployee.id);
+      const nextProfile = formToProfile(form);
 
-    updatePayrollProfile(orgId, selectedEmployee, prevProfile, nextProfile, actorName);
-    const refreshed = getPayrollProfile(orgId, selectedEmployee.id);
-    setForm(profileToForm(refreshed));
-    setSaveNotice("Changes saved.");
+      await updatePayrollProfile(
+        supabase,
+        orgId,
+        selectedEmployee,
+        prevProfile,
+        nextProfile,
+        actorName
+      );
+      const refreshed = await fetchPayrollProfile(supabase, orgId, selectedEmployee.id);
+      setForm(profileToForm(refreshed));
+      setSaveNotice("Changes saved.");
+    } catch (error) {
+      console.error(error);
+      setErrorNotice("Unable to save changes.");
+    }
   }
 
   useEffect(() => {
@@ -254,24 +332,119 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
     setIsCreatingNew(true);
     setNewEmployee({ name: "", role: "", department: "" });
     setSelectedEmployeeId("");
-    const blankProfile = getPayrollProfile(orgId, "__new__");
+    const blankProfile = getBlankPayrollProfile();
     setForm(profileToForm(blankProfile));
   }
 
-  function handleConfirmDelete() {
+  async function handleConfirmDelete() {
     if (!deleteCandidate) return;
-    deleteEmployeeProfile(orgId, deleteCandidate.id);
-    const refreshedEmployees = getEmployees(orgId);
-    setEmployees(refreshedEmployees);
-    setDeleteCandidate(null);
-    const fallbackId = refreshedEmployees[0]?.id ?? "";
-    if (fallbackId) {
-      setSelectedEmployeeId(fallbackId);
-      const profile = getPayrollProfile(orgId, fallbackId);
-      setForm(profileToForm(profile));
-    } else {
-      setSelectedEmployeeId("");
-      setForm(null);
+    setErrorNotice("");
+    try {
+      await deleteEmployeeProfile(supabase, orgId, deleteCandidate.id);
+      const refreshedEmployees = await fetchEmployees(supabase, orgId);
+      setEmployees(refreshedEmployees);
+      setDeleteCandidate(null);
+      const fallbackId = refreshedEmployees[0]?.id ?? "";
+      if (fallbackId) {
+        setSelectedEmployeeId(fallbackId);
+        const profile = await fetchPayrollProfile(supabase, orgId, fallbackId);
+        setForm(profileToForm(profile));
+      } else {
+        setSelectedEmployeeId("");
+        setForm(null);
+      }
+    } catch (error) {
+      console.error(error);
+      setErrorNotice("Unable to delete the employee.");
+    }
+  }
+
+  async function handleMigrateLocal() {
+    setMigrationStatus("running");
+    setErrorNotice("");
+    try {
+      const localState = loadPayrollState();
+      const localEmployees = localState.employeesByOrgId?.[orgId] ?? [];
+      const localProfiles = localState.payrollByOrgId?.[orgId] ?? {};
+      const localLogs = localState.payrollChangeLogByOrgId?.[orgId] ?? [];
+
+      if (localEmployees.length === 0) {
+        setMigrationReady(false);
+        setMigrationStatus("done");
+        return;
+      }
+
+      const idMap = new Map<string, string>();
+      for (const employee of localEmployees) {
+        const { data, error } = await supabase
+          .from("payroll_employees")
+          .insert({
+            org_id: orgId,
+            name: employee.name,
+            role: employee.role,
+            department: employee.department,
+          })
+          .select("id")
+          .single();
+
+        if (error || !data) {
+          throw error ?? new Error("Unable to migrate employee.");
+        }
+
+        const newId = data.id as string;
+        idMap.set(employee.id, newId);
+        const profile = localProfiles[employee.id] ?? getBlankPayrollProfile();
+
+        const { error: profileError } = await supabase.from("payroll_profiles").insert({
+          employee_id: newId,
+          org_id: orgId,
+          pay_type: profile.payType,
+          hourly_rate: profile.hourlyRate,
+          salary_amount: profile.salaryAmount,
+          pto_accrual_rate: profile.ptoAccrualRate,
+          stipend: profile.stipend,
+          notes: profile.notes,
+          pay_periods_per_year: profile.payPeriodsPerYear,
+          is_active: profile.isActive,
+          department_rates: profile.departmentRates,
+          effective_date: profile.effectiveDate,
+        });
+
+        if (profileError) {
+          throw profileError;
+        }
+      }
+
+      const logRows = localLogs.map((log) => ({
+        org_id: orgId,
+        employee_id: idMap.get(log.employeeId) ?? null,
+        employee_name: log.employeeName,
+        actor_name: log.actorName,
+        created_at: log.createdAt,
+        summary: log.summary || "Updated payroll fields",
+        fields_changed: log.fieldsChanged ?? [],
+        change_type: log.changeType ?? null,
+        note_before: log.noteBefore ?? null,
+        note_after: log.noteAfter ?? null,
+      }));
+
+      if (logRows.length > 0) {
+        const { error: logError } = await supabase.from("payroll_change_logs").insert(logRows);
+        if (logError) {
+          throw logError;
+        }
+      }
+
+      window.localStorage.setItem(`organizer_payroll_migrated_${orgId}`, "true");
+      const refreshedEmployees = await fetchEmployees(supabase, orgId);
+      setEmployees(refreshedEmployees);
+      setMigrationReady(false);
+      setMigrationStatus("done");
+      setSaveNotice("Local payroll data backed up to Supabase.");
+    } catch (error) {
+      console.error(error);
+      setMigrationStatus("error");
+      setErrorNotice("Unable to back up local payroll data.");
     }
   }
 
@@ -295,6 +468,22 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
             <div className="text-lg font-semibold">Profiles at a glance</div>
             <div className="text-sm opacity-80">Select an employee to edit payroll.</div>
           </div>
+          {migrationReady ? (
+            <NativeMessage
+              title="Local payroll data found"
+              body="Back it up to Supabase so it’s available across devices."
+              actions={
+                <button
+                  className="btn btn-sm"
+                  type="button"
+                  onClick={handleMigrateLocal}
+                  disabled={migrationStatus === "running"}
+                >
+                  {migrationStatus === "running" ? "Backing up…" : "Back up local data"}
+                </button>
+              }
+            />
+          ) : null}
           <input
             className="w-full rounded-xl border px-3 py-2"
             placeholder="Search employees…"
@@ -684,6 +873,11 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
                   </div>
                 }
               />
+            </div>
+          ) : null}
+          {errorNotice ? (
+            <div className="mt-2">
+              <NativeMessage title={errorNotice} tone="danger" />
             </div>
           ) : null}
           {saveNotice ? (
