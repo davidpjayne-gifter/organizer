@@ -159,9 +159,10 @@ export default function PayrollClient({ orgId, orgName, actorName }: PayrollClie
 
   useEffect(() => {
     if (!selectedEmployee || isCreatingNew) return;
+    const employeeId = selectedEmployee.id;
     let isMounted = true;
     async function loadProfile() {
-      const profile = await fetchPayrollProfile(supabase, orgId, selectedEmployee.id);
+      const profile = await fetchPayrollProfile(supabase, orgId, employeeId);
       if (!isMounted) return;
       setForm(profileToForm(profile));
     }
